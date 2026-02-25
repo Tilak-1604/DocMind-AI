@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+venv/
+.env
+*.pyc
+
+# Java / Spring Boot
+target/
+*.class
+*.jar
+.mvn/
+.idea/
+
+# System
+.DS_Store
