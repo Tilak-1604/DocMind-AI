@@ -2,9 +2,8 @@
 fastapi==0.115.0
 uvicorn==0.30.0
 
-# AI & LLM
-google-generativeai==0.8.0
-langchain-google-genai==2.0.0
+# Gemini SDK (NEW SDK you are using)
+google-genai==1.64.0
 
 # Vector Database
 pinecone-client==5.0.0
