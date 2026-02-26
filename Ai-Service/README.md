@@ -191,3 +191,145 @@ Response:
 ## 👨‍💻 Author
 
 Built as part of AI Knowledge Assistant project.
+
+
+
+💬 Conversational Chat Memory (New Feature)
+
+This project now supports Conversational RAG with Short-Term Memory, allowing users to ask follow-up questions such as:
+
+“What is its disadvantage?”
+
+“Explain the second point.”
+
+“Compare it with the previous concept.”
+
+“Explain it in simple terms.”
+
+🧠 How Chat Memory Works
+
+The system now maintains a conversation session using:
+
+MySQL database
+
+Unique conversation_id
+
+Windowed short-term memory (last 3–5 Q&A pairs)
+
+🔄 Updated Conversational Flow
+User Question
+      ↓
+Load Recent Messages (MySQL)
+      ↓
+Embed (Conversation History + Question)
+      ↓
+Pinecone Vector Search
+      ↓
+Retrieve Top K Chunks
+      ↓
+Gemini LLM (Grounded Answer)
+      ↓
+Save Q&A to MySQL
+      ↓
+Return Final Response
+🗄 Chat Memory Architecture
+Database Design
+
+Two tables are used:
+
+1️⃣ conversations
+
+id
+
+user_id
+
+created_at
+
+2️⃣ messages
+
+id
+
+conversation_id
+
+role (user / assistant)
+
+content
+
+created_at
+
+📤 Additional API Endpoints
+💬 Create Conversation
+
+POST /conversation
+
+Form Data:
+
+user_id
+
+Response:
+
+{
+  "conversation_id": "uuid"
+}
+
+Each chat session must start by creating a conversation.
+
+💬 Conversational Chat
+
+POST /chat
+
+Form Data:
+
+user_id
+
+conversation_id
+
+question
+
+Response:
+
+{
+  "answer": "...",
+  "sources": ["doc1#chunk2"]
+}
+🧩 Memory Strategy
+
+Only last few messages are loaded (windowed memory)
+
+Embedding strategy:
+
+embed(history + question)
+
+This ensures Pinecone retrieval understands context
+
+Prevents hallucination in follow-up questions
+
+🔧 Additional Setup Required for Chat Memory
+Install Dependencies
+
+Add MySQL + SQLAlchemy support:
+
+pip install sqlalchemy pymysql
+Update Environment Variables
+
+Add database connection in .env:
+
+DATABASE_URL=mysql+pymysql://root:password@localhost:3306/ai_assistant
+Create MySQL Database
+CREATE DATABASE ai_assistant;
+
+Tables will be auto-created on first run.
+
+🎯 What This Adds to the System
+
+The system now supports:
+
+Context-aware follow-up questions
+
+Session-based conversation tracking
+
+Short-term conversational memory
+
+Improved retrieval for vague references ("it", "that")
+
+Production-style conversational RAG architecture
