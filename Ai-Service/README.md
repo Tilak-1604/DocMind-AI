@@ -333,3 +333,117 @@ Short-term conversational memory
 Improved retrieval for vague references ("it", "that")
 
 Production-style conversational RAG architecture
+
+
+
+🚀New Added Features
+📝 1. Document Summary
+
+Generate a concise and structured summary of the entire document.
+
+Endpoint
+
+POST /documents/{doc_id}/summary
+
+Response
+
+{
+  "summary": "Concise structured summary of the document..."
+}
+
+Use Cases
+
+Quick revision
+
+High-level understanding
+
+Exam preparation
+
+🧠 2. Key Topics Extraction
+
+Extract important topics with clear definitions from the document.
+
+Endpoint
+
+POST /documents/{doc_id}/topics
+
+Response
+
+{
+  "topics": [
+    {
+      "title": "Supervised Learning",
+      "definition": "A machine learning approach where..."
+    }
+  ]
+}
+
+Use Cases
+
+Identify core concepts
+
+Create revision sheets
+
+Structured study preparation
+
+🎯 3. Flashcard Generation
+
+Generate exam-ready question-answer flashcards from the document.
+
+Endpoint
+
+POST /documents/{doc_id}/flashcards
+
+Response
+
+{
+  "flashcards": [
+    {
+      "question": "What is supervised learning?",
+      "answer": "Supervised learning is..."
+    }
+  ]
+}
+
+Use Cases
+
+Active recall practice
+
+Interview preparation
+
+Self-testing
+
+📖 4. Study Mode
+
+Provides structured, exam-oriented explanations of the document in a simplified and easy-to-understand format.
+
+Endpoint
+
+POST /documents/{doc_id}/study-mode
+
+Response
+
+{
+  "study_notes": "Structured, exam-oriented explanation of the document..."
+}
+
+Use Cases
+
+Deep conceptual understanding
+
+Beginner-friendly learning
+
+Step-by-step topic breakdown
+
+🏗 System Architecture
+User Request
+     ↓
+FastAPI Endpoint
+     ↓
+Document Tools Service
+     ↓
+Retrieve Document Chunks (Vector DB)
+     ↓
+LLM Processing
+     ↓
+Structured JSON Response

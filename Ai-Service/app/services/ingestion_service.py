@@ -3,6 +3,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pinecone import Pinecone
 from google import genai
 from app.core.config import settings
+from app.repositories.document_repository import create_document
+from app.db import SessionLocal
 
 # 🔹 Initialize Gemini
 gemini_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
@@ -71,6 +73,15 @@ def process_pdf_to_pinecone(file_path: str, doc_id: str, user_id: str):
     )
 
     print("Vectors upserted to Pinecone:", len(vectors))
+
+    # 5️⃣ Save document metadata to database
+    db = SessionLocal()
+    try:
+        create_document(db, doc_id, user_id, len(chunks))
+        print("Document metadata saved to database")
+    finally:
+        db.close()
+
     print("==========================================\n")
 
     return len(chunks)
