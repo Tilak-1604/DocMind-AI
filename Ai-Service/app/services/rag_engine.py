@@ -12,7 +12,7 @@ def get_relevant_context(
     question: str,
     user_id: str,
     conversation_id: str,
-    top_k: int = 3
+    top_k: int = 5
 ):
 
     print("\n================ QUESTION DEBUG ================")
@@ -55,42 +55,49 @@ def get_relevant_context(
         score = match["score"]
 
         if score >= score_threshold:
-            text = match["metadata"].get("text", "")
-            context_chunks.append(text)
+            meta = match["metadata"]
+            text = meta.get("text", "")
+            doc_name = meta.get("document_name", "Unknown Document")
+            page_num = meta.get("page_number", "Unknown Page")
+            
+            # Format chunks with explicit citation metadata
+            formatted_chunk = f"[Source: {doc_name} (Page {page_num})]\n{text}"
+            context_chunks.append(formatted_chunk)
             source_ids.append(match["id"])
 
     if not context_chunks:
+        answer = "I cannot find this information in the uploaded documents."
+        save_message(conversation_id, "user", question)
+        save_message(conversation_id, "assistant", answer)
         return {
-            "answer": "No relevant information found in document.",
+            "answer": answer,
             "sources": []
         }
 
     context = "\n\n---\n\n".join(context_chunks)
 
     # ----------------------------------
-    # 4️⃣ Build Conversational Prompt
+    # 4️⃣ Build Strict Conversational Prompt
     # ----------------------------------
     prompt = f"""
-You are an AI Knowledge Assistant.
+You are a document-based AI assistant.
+Answer ONLY using the provided context.
+If the answer is not found in the context, respond with:
+"I cannot find this information in the uploaded documents."
+Do NOT use external knowledge.
+Always cite the source document name and page number when possible.
 
-You MUST answer ONLY using the provided document context.
-If answer is not found, say:
-"Answer not found in document."
+----------------------
+Context:
+{context}
 
 ----------------------
 Conversation History:
 {formatted_history}
 
 ----------------------
-Document Context:
-{context}
-
-----------------------
-Current Question:
+Question:
 {question}
-
-If the user refers to previous discussion (like "it", "that", "second point"),
-use the conversation history to resolve it.
 
 Answer:
 """

@@ -1,4 +1,6 @@
 import pdfplumber
+import uuid
+import os
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pinecone import Pinecone
 from google import genai
@@ -14,74 +16,78 @@ pc = Pinecone(api_key=settings.PINECONE_API_KEY)
 index = pc.Index(settings.PINECONE_INDEX_NAME)
 
 
-def process_pdf_to_pinecone(file_path: str, doc_id: str, user_id: str):
+def process_pdf_to_pinecone(file_path: str, doc_id: str, user_id: str, document_name: str):
 
-    print("\n=========== PDF INGESTION DEBUG ===========")
+    print(f"\n=========== PDF INGESTION DEBUG: {document_name} ===========")
 
-    # 1️⃣ Extract text
-    raw_text = ""
-
-    with pdfplumber.open(file_path) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                raw_text += text + "\n"
-
-    print("Extracted text length:", len(raw_text))
-
-    # 2️⃣ Chunk text
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200
     )
 
-    chunks = splitter.split_text(raw_text)
-
-    print("Total chunks created:", len(chunks))
-    print("Color word present?:", any("colour" in c.lower() for c in chunks))
-
     vectors = []
+    total_chunks = 0
+    document_base_name = os.path.basename(document_name).replace(" ", "_")
 
-    for i, chunk in enumerate(chunks):
+    # 1️⃣ Extract text per page
+    with pdfplumber.open(file_path) as pdf:
+        for page_num, page in enumerate(pdf.pages, start=1):
+            text = page.extract_text()
+            if not text:
+                continue
 
-        print(f"\nProcessing chunk {i}")
+            # 2️⃣ Chunk text specifically for this page
+            page_chunks = splitter.split_text(text)
 
-        # 3️⃣ Generate embedding from Gemini
-        response = gemini_client.models.embed_content(
-            model="gemini-embedding-001",
-            contents=chunk
+            for chunk_index, chunk in enumerate(page_chunks):
+                print(f"Processing Page {page_num} - Chunk {chunk_index}")
+
+                # 3️⃣ Generate embedding from Gemini
+                response = gemini_client.models.embed_content(
+                    model="gemini-embedding-001",
+                    contents=chunk
+                )
+
+                embedding = response.embeddings[0].values
+                
+                # 4️⃣ Format the rigorous unique Chunk ID
+                unique_chunk_uuid = str(uuid.uuid4())
+                chunk_id = f"{user_id}_{document_base_name}_p{page_num}_c{chunk_index}_{unique_chunk_uuid}"
+
+                vectors.append({
+                    "id": chunk_id,
+                    "values": embedding,
+                    "metadata": {
+                        "text": chunk,
+                        "document_name": document_name,
+                        "page_number": page_num,
+                        "user_id": str(user_id)
+                    }
+                })
+
+                total_chunks += 1
+
+    # 5️⃣ Upsert to Pinecone
+    # Pinecone upserts must be done in batches to avoid payload size limits (batch of 100)
+    batch_size = 100
+    for i in range(0, len(vectors), batch_size):
+        batch = vectors[i:i + batch_size]
+        index.upsert(
+            vectors=batch,
+            namespace=str(user_id)
         )
+        print(f"Upserted batch of {len(batch)} vectors to Pinecone...")
 
-        embedding = response.embeddings[0].values
-        print("Embedding length:", len(embedding))
+    print("Total vectors upserted to Pinecone:", total_chunks)
 
-        vectors.append({
-            "id": f"{doc_id}#chunk{i}",
-            "values": embedding,
-            "metadata": {
-                "doc_id": str(doc_id),
-                "user_id": str(user_id),
-                "chunk_index": i,
-                "text": chunk
-            }
-        })
-
-    # 4️⃣ Upsert to Pinecone
-    index.upsert(
-        vectors=vectors,
-        namespace=str(user_id)
-    )
-
-    print("Vectors upserted to Pinecone:", len(vectors))
-
-    # 5️⃣ Save document metadata to database
+    # 6️⃣ Save document metadata to database
     db = SessionLocal()
     try:
-        create_document(db, doc_id, user_id, len(chunks))
+        create_document(db, doc_id, user_id, total_chunks)
         print("Document metadata saved to database")
     finally:
         db.close()
 
     print("==========================================\n")
 
-    return len(chunks)
+    return total_chunks

@@ -42,7 +42,12 @@ async def upload_document(
 
     try:
         # 1️⃣ Process PDF and store embeddings
-        chunk_count = process_pdf_to_pinecone(temp_path, doc_id, user_id)
+        chunk_count = process_pdf_to_pinecone(
+            file_path=temp_path, 
+            doc_id=doc_id, 
+            user_id=user_id, 
+            document_name=file.filename
+        )
 
         # 2️⃣ Save or Update document metadata in DB
         db = SessionLocal()
