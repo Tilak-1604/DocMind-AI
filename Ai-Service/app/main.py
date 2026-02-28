@@ -7,7 +7,8 @@ from app.services.document_tools_service import (
     summarize_document,
     generate_flashcards,
     extract_key_topic,
-    study_mode
+    study_mode,
+    generate_mind_map
 )
 import shutil
 import os
@@ -136,3 +137,10 @@ async def study(
     user_id: str = Form(...)
 ):
     return {"study_notes": study_mode(user_id, doc_id)}
+
+@app.post("/documents/{doc_id}/mind-map")
+async def mind_map(
+    doc_id: str,
+    user_id: str = Form(...)
+):
+    return {"mind_map": generate_mind_map(user_id, doc_id)}

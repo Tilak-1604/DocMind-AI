@@ -3,6 +3,7 @@ from app.services.summarization_service import summarize_document as generate_su
 from app.services.flashcard_service import generate_flashcards as create_flashcards
 from app.services.topic_extraction_service import extract_key_topics
 from app.services.study_mode_service import study_mode as generate_study_mode
+from app.services.mind_map_service import generate_mind_map as create_mind_map
 
 
 def get_all_document_chunks(user_id: str, doc_id: str, top_k: int = 1000):
@@ -53,3 +54,12 @@ def study_mode(user_id: str, doc_id: str):
     Uses Gemini 2.5 Flash model.
     """
     return generate_study_mode(user_id, doc_id)
+
+def generate_mind_map(user_id: str, doc_id: str):
+    """
+    Generate a mind map from document content.
+
+    Delegates to mind_map_service for clean separation of concerns.
+    Uses Gemini 2.5 Flash model and outputs PlantUML.
+    """
+    return create_mind_map(user_id, doc_id)
