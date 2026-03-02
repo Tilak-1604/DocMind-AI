@@ -13,16 +13,22 @@ from app.services.document_tools_service import (
 import shutil
 import os
 
+# DB table auto-creation on startup
+from app.db import engine, Base
+from app.models import conversation, message, document  # existing models
+from app.models import conversation_summary              # new smart-memory model
+
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI()
 
+@app.get("/")
+async def health_check():
+    return {"status": "ok", "service": "DocMind AI RAG Engine"}
+
 
 # ----------------------------
-# 1️⃣ Upload Document
-from app.db import SessionLocal
-from app.repositories.document_repository import create_document
-
-# ----------------------------
-# 1️⃣ Upload Document
+# Upload Document
 # ----------------------------
 from app.db import SessionLocal
 from app.repositories.document_repository import (
@@ -108,7 +114,6 @@ async def chat(
     }
     
     
-from fastapi import Form
 
 @app.post("/documents/{doc_id}/summarize")
 async def summarize(

@@ -1,10 +1,15 @@
-from sqlalchemy import desc
+from sqlalchemy import desc, func as sql_func
 from app.db import SessionLocal
 from app.models.message import Message
 from app.models.conversation import Conversation
+from app.models.conversation_summary import ConversationSummary
 
 
-def create_conversation(user_id: str):
+# ─────────────────────────────────────────────
+# Conversation Management
+# ─────────────────────────────────────────────
+
+def create_conversation(user_id: str) -> str:
     db = SessionLocal()
     conversation = Conversation(user_id=user_id)
     db.add(conversation)
@@ -13,6 +18,10 @@ def create_conversation(user_id: str):
     db.close()
     return str(conversation.id)
 
+
+# ─────────────────────────────────────────────
+# Message Persistence
+# ─────────────────────────────────────────────
 
 def save_message(conversation_id: str, role: str, content: str):
     db = SessionLocal()
@@ -26,7 +35,11 @@ def save_message(conversation_id: str, role: str, content: str):
     db.close()
 
 
-def get_recent_messages(conversation_id: str, limit: int = 6):
+def get_recent_messages(conversation_id: str, limit: int = 4):
+    """
+    Returns the most recent `limit` messages in chronological order.
+    Default is 4 (last 2 exchanges) when summary mode is active.
+    """
     db = SessionLocal()
     messages = (
         db.query(Message)
@@ -36,5 +49,79 @@ def get_recent_messages(conversation_id: str, limit: int = 6):
         .all()
     )
     db.close()
-
     return list(reversed(messages))
+
+
+def get_message_count(conversation_id: str) -> int:
+    """Returns total number of messages stored in this conversation."""
+    db = SessionLocal()
+    count = (
+        db.query(sql_func.count(Message.id))
+        .filter(Message.conversation_id == conversation_id)
+        .scalar()
+    )
+    db.close()
+    return count or 0
+
+
+def get_old_messages_for_compression(conversation_id: str, keep_recent: int = 4):
+    """
+    Returns all messages EXCEPT the most recent `keep_recent` ones.
+    These older messages are candidates for Gemini compression.
+    """
+    db = SessionLocal()
+    all_messages = (
+        db.query(Message)
+        .filter(Message.conversation_id == conversation_id)
+        .order_by(Message.created_at)
+        .all()
+    )
+    db.close()
+
+    # Exclude the most recent `keep_recent` messages
+    if len(all_messages) <= keep_recent:
+        return []
+    return all_messages[:-keep_recent]
+
+
+# ─────────────────────────────────────────────
+# Smart Memory Compression
+# ─────────────────────────────────────────────
+
+def get_conversation_summary(conversation_id: str) -> str | None:
+    """
+    Returns the existing Gemini-generated summary for this conversation,
+    or None if no summary has been generated yet.
+    """
+    db = SessionLocal()
+    record = (
+        db.query(ConversationSummary)
+        .filter(ConversationSummary.conversation_id == conversation_id)
+        .first()
+    )
+    db.close()
+    return record.summary if record else None
+
+
+def save_conversation_summary(conversation_id: str, summary_text: str):
+    """
+    Upserts the conversation summary. Creates if not exists, updates if exists.
+    """
+    db = SessionLocal()
+    record = (
+        db.query(ConversationSummary)
+        .filter(ConversationSummary.conversation_id == conversation_id)
+        .first()
+    )
+
+    if record:
+        record.summary = summary_text
+    else:
+        record = ConversationSummary(
+            conversation_id=conversation_id,
+            summary=summary_text
+        )
+        db.add(record)
+
+    db.commit()
+    db.close()
