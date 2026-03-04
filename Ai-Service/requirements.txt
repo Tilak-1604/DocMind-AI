@@ -27,3 +27,4 @@ pinecone-client
 google-genai
 python-multipart
 python-dotenv
+groq

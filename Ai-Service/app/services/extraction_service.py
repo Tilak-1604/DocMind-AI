@@ -1,6 +1,6 @@
 import json
 from typing import List, Dict, Any
-from google import genai
+from groq import Groq
 from pydantic import BaseModel
 from pydantic.json import pydantic_encoder
 from app.core.config import settings
@@ -9,8 +9,8 @@ from app.repositories.chunk_repository import get_document_chunks
 from app.repositories.document_repository import get_document_by_id
 from app.models.extracted_data import ExtractedChunk
 
-# Initialize Gemini client
-gemini_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+# Initialize Groq client
+groq_client = Groq(api_key=settings.GROQ_API_KEY)
 
 # Define Pydantic models for structured output
 class KeyConcept(BaseModel):
@@ -74,17 +74,14 @@ Text:
 {chunk_text}
 """
                 
-                response = gemini_client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=[prompt],
-                    config=genai.types.GenerateContentConfig(
-                         response_mime_type="application/json",
-                         response_schema=ExtractedData,
-                         temperature=0.2
-                    )
+                response = groq_client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    temperature=0.2
                 )
 
-                extracted_data = json.loads(response.text)
+                extracted_data = json.loads(response.choices[0].message.content)
                 
                 # Save to database
                 db_chunk = ExtractedChunk(
@@ -155,11 +152,11 @@ Content:
 {final_content}
 """
     try:
-        final_response = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[final_prompt]
+        final_response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": final_prompt}]
         )
-        return final_response.text.strip()
+        return final_response.choices[0].message.content.strip()
     except Exception as e:
         print(f"Error generating final summary: {e}")
         return "Error generating final summary."
@@ -180,11 +177,11 @@ Topics:
 {unique_topics}
 """
     try:
-        response = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[prompt]
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}]
         )
-        result = response.text.replace('```plantuml', '').replace('```', '').strip()
+        result = response.choices[0].message.content.replace('```plantuml', '').replace('```', '').strip()
         if not result.startswith('@startmindmap'):
             result = "@startmindmap\\n" + result
         if not result.endswith('@endmindmap'):
