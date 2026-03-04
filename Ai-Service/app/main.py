@@ -1,7 +1,8 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
 from app.services.ingestion_service import process_pdf_to_pinecone
 from app.services.rag_engine import get_relevant_context
 from app.services.memory_service import create_conversation
+from app.services.extraction_service import run_background_extraction
 
 from app.services.document_tools_service import (
     summarize_document,
@@ -17,6 +18,7 @@ import os
 from app.db import engine, Base
 from app.models import conversation, message, document  # existing models
 from app.models import conversation_summary              # new smart-memory model
+from app.models import extracted_data                    # new single-pass extraction model
 
 Base.metadata.create_all(bind=engine)
 
@@ -38,6 +40,7 @@ from app.repositories.document_repository import (
 
 @app.post("/upload")
 async def upload_document(
+    background_tasks: BackgroundTasks,
     user_id: str = Form(...),
     doc_id: str = Form(...),
     file: UploadFile = File(...)
@@ -74,8 +77,11 @@ async def upload_document(
         finally:
             db.close()
 
+        # 3️⃣ Add the extraction to BackgroundTasks
+        background_tasks.add_task(run_background_extraction, user_id, doc_id)
+
         return {
-            "status": "success",
+            "status": "processing_features",
             "doc_id": doc_id,
             "chunks_stored": chunk_count
         }

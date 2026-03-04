@@ -1,54 +1,27 @@
-from google import genai
-from app.core.config import settings
-from app.repositories.chunk_repository import get_document_chunks
-
-# Initialize Gemini client
-gemini_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
-
+import json
+from app.db import SessionLocal
+from app.models.extracted_data import ExtractedChunk
 
 def extract_key_topics(user_id: str, doc_id: str):
-    """
-    Extract important topics and definitions from document content.
-    
-    Args:
-        user_id: User identifier for access validation
-        doc_id: Document identifier
-        
-    Returns:
-        JSON string containing topics with titles and definitions
-        
-    Raises:
-        ValueError: If document not found or access denied
-    """
-    # Retrieve chunks deterministically
-    chunks = get_document_chunks(user_id, doc_id)
-    
-    if not chunks:
-        return '{"error": "No document content found."}'
-    
-    # Limit chunks for safety and token management
-    content = "\n\n".join(chunks[:20])
-    
-    prompt = f"""
-Extract important topics and definitions.
-
-Return JSON:
-{{
-  "topics": [
-    {{"title": "...", "definition": "..."}}
-  ]
-}}
-
-Content:
-{content}
-"""
-    
+    db = SessionLocal()
     try:
-        response = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[prompt]
-        )
+        chunks = db.query(ExtractedChunk).filter(
+            ExtractedChunk.doc_id == doc_id,
+            ExtractedChunk.user_id == user_id
+        ).all()
         
-        return response.text
-    except Exception as e:
-        return f'{{"error": "Error extracting topics: {str(e)}"}}'
+        if not chunks:
+            return json.dumps({"error": "No data found. Document may still be processing or failed."})
+            
+        all_topics = []
+        for chunk in chunks:
+            if chunk.key_concepts:
+                for concept in chunk.key_concepts:
+                    all_topics.append({
+                        "title": concept.get("term", ""),
+                        "definition": concept.get("definition", "")
+                    })
+                    
+        return json.dumps({"topics": all_topics})
+    finally:
+        db.close()
