@@ -28,3 +28,4 @@ google-genai
 python-multipart
 python-dotenv
 groq
+kafka-python-ng
