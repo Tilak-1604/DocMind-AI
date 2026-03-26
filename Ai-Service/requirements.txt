@@ -2,8 +2,9 @@
 fastapi==0.115.0
 uvicorn==0.30.0
 
-# Gemini SDK (NEW SDK you are using)
+# AI / LLM
 google-genai==1.64.0
+groq==1.1.2
 
 # Vector Database
 pinecone-client==5.0.0
@@ -12,20 +13,17 @@ pinecone-client==5.0.0
 pdfplumber==0.11.4
 pypdf==4.3.0
 
+# Backend / DB
+sqlalchemy==2.0.47
+pymysql==1.1.2
+
 # Utilities
 python-dotenv==1.0.1
 pydantic==2.9.0
+python-multipart==0.0.22
 
+# Kafka
+kafka-python-ng==2.2.3
 
-fastapi
-uvicorn
-sqlalchemy
-pymysql
-pdfplumber
-langchain-text-splitters
-pinecone-client
-google-genai
-python-multipart
-python-dotenv
-groq
-kafka-python-ng
+# Text Processing
+langchain-text-splitters==1.1.1

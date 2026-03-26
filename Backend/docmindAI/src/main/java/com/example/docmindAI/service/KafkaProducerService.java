@@ -1,5 +1,8 @@
 package com.example.docmindAI.service;
 
+import com.example.docmindAI.model.AIRequest;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -12,7 +15,15 @@ public class KafkaProducerService {
     @Autowired
     private KafkaTemplate<String, String> kafkaTemplate;
 
-    public void sendMessage(String message) {
-        this.kafkaTemplate.send(TOPIC, message);
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    public void sendMessage(AIRequest request) {
+        try {
+            String jsonMessage = objectMapper.writeValueAsString(request);
+            this.kafkaTemplate.send(TOPIC, jsonMessage);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
     }
 }

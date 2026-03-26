@@ -9,8 +9,12 @@ from app.repositories.chunk_repository import get_document_chunks
 from app.repositories.document_repository import get_document_by_id
 from app.models.extracted_data import ExtractedChunk
 
-# Initialize Groq client
-groq_client = Groq(api_key=settings.GROQ_API_KEY)
+# Initialize Groq client (optional for startup)
+groq_client = None
+if settings.GROQ_API_KEY:
+    groq_client = Groq(api_key=settings.GROQ_API_KEY)
+else:
+    print("WARNING: GROQ_API_KEY not found. Extraction features will be disabled.")
 
 # Define Pydantic models for structured output
 class KeyConcept(BaseModel):
@@ -74,6 +78,10 @@ Text:
 {chunk_text}
 """
                 
+                if not groq_client:
+                    print(f"Skipping extraction for chunk {i}: Groq client not initialized.")
+                    continue
+
                 response = groq_client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=[{"role": "user", "content": prompt}],
@@ -151,6 +159,9 @@ def _generate_global_summary(chunk_summaries: List[str]) -> str:
 Content:
 {final_content}
 """
+    if not groq_client:
+        return "Global summary skipped (Groq client not initialized)."
+
     try:
         final_response = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -176,6 +187,9 @@ Do not use markdown formatting.
 Topics:
 {unique_topics}
 """
+    if not groq_client:
+        return "@startmindmap\n* Mindmap disabled (Groq skipped)\n@endmindmap"
+
     try:
         response = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
