@@ -60,8 +60,9 @@ def get_document_chunks(user_id: str, doc_id: str) -> List[str]:
                 chunks.append(chunk_text)
             else:
                 # Log warning for missing chunks but continue
-                print(f"Warning: Chunk {chunk_id} not found in Pinecone")
+                print(f"Warning: Chunk {chunk_id} not found in Pinecone namespace {user_id}")
         
+        print(f"Successfully fetched {len(chunks)}/{chunk_count} chunks for doc {doc_id}")
         return chunks
         
     finally:

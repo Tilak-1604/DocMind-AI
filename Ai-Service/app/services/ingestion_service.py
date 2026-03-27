@@ -50,9 +50,8 @@ def process_pdf_to_pinecone(file_path: str, doc_id: str, user_id: str, document_
 
                 embedding = response.embeddings[0].values
                 
-                # 4️⃣ Format the rigorous unique Chunk ID
-                unique_chunk_uuid = str(uuid.uuid4())
-                chunk_id = f"{user_id}_{document_base_name}_p{page_num}_c{chunk_index}_{unique_chunk_uuid}"
+                # 4️⃣ Format the rigorous unique Chunk ID (Deterministic for retrieval)
+                chunk_id = f"{doc_id}#chunk{total_chunks}"
 
                 vectors.append({
                     "id": chunk_id,

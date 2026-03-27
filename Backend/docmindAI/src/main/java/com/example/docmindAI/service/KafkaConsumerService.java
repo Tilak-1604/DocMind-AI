@@ -12,10 +12,17 @@ public class KafkaConsumerService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private ResponseCacheService responseCacheService;
+
     @KafkaListener(topics = "ai_responses", groupId = "spring-boot-group")
     public void consume(String message) {
         try {
             AIResponse response = objectMapper.readValue(message, AIResponse.class);
+            
+            // Store the response for the frontend to poll
+            responseCacheService.storeResponse(response.getRequest_id(), response);
+
             System.out.println("\n--- RECEIVED AI RESPONSE ---");
             System.out.println("Request ID: " + response.getRequest_id());
             System.out.println("Answer: " + response.getAnswer());
