@@ -19,6 +19,7 @@ from app.services.memory_service import (
     get_old_messages_for_compression,
     get_conversation_summary,
     save_conversation_summary,
+    get_rag_memory_context,
 )
 
 # ─────────────────────────────────────────────
@@ -143,21 +144,28 @@ def get_intent_style_instruction(intent: str) -> str:
 # ─────────────────────────────────────────────
 # Feature 4: Smart Memory Compression
 # ─────────────────────────────────────────────
-def maybe_compress_memory(conversation_id: str) -> str | None:
+def maybe_compress_memory(
+    conversation_id: str,
+    total_messages: int,
+    existing_summary: str | None,
+) -> str | None:
     """
     Checks if memory compression is needed.
     If message count > threshold AND no summary exists yet,
     compresses older messages with Gemini and stores the summary.
-    
+
+    Accepts pre-fetched ``total_messages`` and ``existing_summary`` to avoid
+    redundant DB queries when called from within ``get_relevant_context``.
+
     Returns the summary text (existing or newly created), or None.
     """
-    # Always try to return existing summary first
-    existing_summary = get_conversation_summary(conversation_id)
+    # Return existing summary when available
+    if existing_summary is not None:
+        return existing_summary
 
-    total_messages = get_message_count(conversation_id)
     print(f"[MEMORY] Total messages in conversation: {total_messages}")
 
-    if total_messages > MEMORY_COMPRESSION_THRESHOLD and existing_summary is None:
+    if total_messages > MEMORY_COMPRESSION_THRESHOLD:
         # Only compress once — when threshold is first crossed
         old_messages = get_old_messages_for_compression(
             conversation_id, keep_recent=RECENT_TURNS_LIMIT
@@ -192,7 +200,7 @@ Summary:"""
             print(f"[MEMORY] Compression failed: {e}")
             return None
 
-    return existing_summary
+    return None
 
 
 # ─────────────────────────────────────────────
@@ -207,9 +215,11 @@ def get_relevant_context(
     print(f"[INPUT] User: {user_id} | Question: {question}")
 
     # ──────────────────────────────────────────
-    # Step 1: Load recent messages for history
+    # Step 1: Load recent messages, count, and summary in ONE DB round-trip
     # ──────────────────────────────────────────
-    recent_messages = get_recent_messages(conversation_id, limit=RECENT_TURNS_LIMIT)
+    recent_messages, total_msg_count, existing_summary = get_rag_memory_context(
+        conversation_id, recent_limit=RECENT_TURNS_LIMIT
+    )
     formatted_history = "\n".join(
         f"{m.role.upper()}: {m.content}" for m in recent_messages
     )
@@ -271,7 +281,11 @@ def get_relevant_context(
     # ──────────────────────────────────────────
     # Step 5: Smart Memory Compression (Feature 4)
     # ──────────────────────────────────────────
-    conversation_summary = maybe_compress_memory(conversation_id)
+    conversation_summary = maybe_compress_memory(
+        conversation_id,
+        total_messages=total_msg_count,
+        existing_summary=existing_summary,
+    )
     summary_block = conversation_summary if conversation_summary else "No prior conversation summary."
 
     # ──────────────────────────────────────────

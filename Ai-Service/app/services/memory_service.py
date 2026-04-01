@@ -125,3 +125,40 @@ def save_conversation_summary(conversation_id: str, summary_text: str):
 
     db.commit()
     db.close()
+
+
+# ─────────────────────────────────────────────
+# Consolidated RAG Memory Loader
+# ─────────────────────────────────────────────
+
+def get_rag_memory_context(conversation_id: str, recent_limit: int = 4) -> tuple:
+    """
+    Fetch recent messages, total message count, and conversation summary
+    in a single DB session to minimise round-trips during a RAG request.
+
+    Returns:
+        (recent_messages, total_count, summary_or_None)
+    """
+    db = SessionLocal()
+    try:
+        recent_messages = (
+            db.query(Message)
+            .filter(Message.conversation_id == conversation_id)
+            .order_by(desc(Message.created_at))
+            .limit(recent_limit)
+            .all()
+        )
+        total_count = (
+            db.query(sql_func.count(Message.id))
+            .filter(Message.conversation_id == conversation_id)
+            .scalar()
+        ) or 0
+        summary_record = (
+            db.query(ConversationSummary)
+            .filter(ConversationSummary.conversation_id == conversation_id)
+            .first()
+        )
+        summary = summary_record.summary if summary_record else None
+        return list(reversed(recent_messages)), total_count, summary
+    finally:
+        db.close()

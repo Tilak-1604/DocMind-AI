@@ -1,5 +1,6 @@
 import json
 from typing import List, Dict, Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from groq import Groq
 from pydantic import BaseModel
 from pydantic.json import pydantic_encoder
@@ -16,6 +17,8 @@ if settings.GROQ_API_KEY:
 else:
     print("WARNING: GROQ_API_KEY not found. Extraction features will be disabled.")
 
+EXTRACTION_WORKERS = 5  # Concurrent Groq API threads for chunk extraction
+
 # Define Pydantic models for structured output
 class KeyConcept(BaseModel):
     term: str
@@ -26,6 +29,38 @@ class ExtractedData(BaseModel):
     key_concepts: List[KeyConcept]
     hierarchical_topics: List[str]
     important_facts: List[str]
+
+def _extract_single_chunk(args: tuple):
+    """Extract structured data from a single chunk via Groq. Returns (index, data_dict, error)."""
+    i, chunk_text = args
+    prompt = f"""Extract structured information from the following text.
+You must output ONLY valid JSON that matches the following schema:
+{{
+  "chunk_summary": "A brief 2-3 sentence summary of the chunk.",
+  "key_concepts": [
+    {{"term": "concept name", "definition": "concept definition"}}
+  ],
+  "hierarchical_topics": ["broad topic", "sub-topic", "specific topic"],
+  "important_facts": ["fact 1", "fact 2"]
+}}
+
+Text:
+{chunk_text}
+"""
+    if not groq_client:
+        return i, None, "Groq client not initialized"
+    try:
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.2
+        )
+        extracted_data = json.loads(response.choices[0].message.content)
+        return i, extracted_data, None
+    except Exception as e:
+        return i, None, str(e)
+
 
 def run_background_extraction(user_id: str, doc_id: str):
     """
@@ -50,66 +85,48 @@ def run_background_extraction(user_id: str, doc_id: str):
             db.commit()
             return
 
-        print(f"Starting background extraction for doc {doc_id} with {len(chunks)} chunks...")
-
-        # Process each chunk
-        chunk_summaries = []
-        all_topics = []
-
-        max_chunks = 50 # Limit to avoid excessive processing
+        max_chunks = 50  # Limit to avoid excessive processing
         if len(chunks) > max_chunks:
             chunks = chunks[:max_chunks]
 
-        for i, chunk_text in enumerate(chunks):
-            print(f"Extracting data for chunk {i+1}/{len(chunks)}...")
-            try:
-                prompt = f"""Extract structured information from the following text.
-You must output ONLY valid JSON that matches the following schema:
-{{
-  "chunk_summary": "A brief 2-3 sentence summary of the chunk.",
-  "key_concepts": [
-    {{"term": "concept name", "definition": "concept definition"}}
-  ],
-  "hierarchical_topics": ["broad topic", "sub-topic", "specific topic"],
-  "important_facts": ["fact 1", "fact 2"]
-}}
+        print(f"Starting background extraction for doc {doc_id} with {len(chunks)} chunks (parallel, {EXTRACTION_WORKERS} workers)...")
 
-Text:
-{chunk_text}
-"""
-                
-                if not groq_client:
-                    print(f"Skipping extraction for chunk {i}: Groq client not initialized.")
+        # Process chunks concurrently
+        chunk_summaries = []
+        all_topics = []
+        results: dict[int, dict] = {}
+
+        with ThreadPoolExecutor(max_workers=EXTRACTION_WORKERS) as executor:
+            chunk_futures = {
+                executor.submit(_extract_single_chunk, (i, chunk_text)): i
+                for i, chunk_text in enumerate(chunks)
+            }
+            for future in as_completed(chunk_futures):
+                i, extracted_data, error = future.result()
+                if error:
+                    print(f"Error extracting chunk {i}: {error}")
                     continue
+                results[i] = extracted_data
 
-                response = groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "user", "content": prompt}],
-                    response_format={"type": "json_object"},
-                    temperature=0.2
-                )
-
-                extracted_data = json.loads(response.choices[0].message.content)
-                
-                # Save to database
-                db_chunk = ExtractedChunk(
-                    id=f"{doc_id}_ext_{i}",
-                    doc_id=doc_id,
-                    user_id=user_id,
-                    chunk_index=i,
-                    chunk_summary=extracted_data.get("chunk_summary", ""),
-                    key_concepts=extracted_data.get("key_concepts", []),
-                    hierarchical_topics=extracted_data.get("hierarchical_topics", []),
-                    important_facts=extracted_data.get("important_facts", [])
-                )
-                db.add(db_chunk)
-                
-                chunk_summaries.append(extracted_data.get("chunk_summary", ""))
-                all_topics.extend(extracted_data.get("hierarchical_topics", []))
-
-            except Exception as e:
-                print(f"Error extracting chunk {i}: {e}")
+        # Persist results in deterministic order and collect aggregates
+        for i in range(len(chunks)):
+            extracted_data = results.get(i)
+            if not extracted_data:
                 continue
+            print(f"Saving extracted data for chunk {i+1}/{len(chunks)}...")
+            db_chunk = ExtractedChunk(
+                id=f"{doc_id}_ext_{i}",
+                doc_id=doc_id,
+                user_id=user_id,
+                chunk_index=i,
+                chunk_summary=extracted_data.get("chunk_summary", ""),
+                key_concepts=extracted_data.get("key_concepts", []),
+                hierarchical_topics=extracted_data.get("hierarchical_topics", []),
+                important_facts=extracted_data.get("important_facts", [])
+            )
+            db.add(db_chunk)
+            chunk_summaries.append(extracted_data.get("chunk_summary", ""))
+            all_topics.extend(extracted_data.get("hierarchical_topics", []))
         
         db.commit()
 
