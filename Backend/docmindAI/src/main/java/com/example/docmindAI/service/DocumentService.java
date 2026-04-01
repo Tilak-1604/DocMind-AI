@@ -54,20 +54,52 @@ public class DocumentService {
     }
 
     public ResponseEntity<String> startConversation(String userId) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        return callAiService("http://localhost:8000/conversation", body);
+    }
+
+    public ResponseEntity<String> chat(String userId, String conversationId, String question) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        body.add("conversation_id", conversationId);
+        body.add("question", question);
+        return callAiService("http://localhost:8000/chat", body);
+    }
+
+    public ResponseEntity<String> summarize(String userId, String docId) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        return callAiService("http://localhost:8000/documents/" + docId + "/summarize", body);
+    }
+
+    public ResponseEntity<String> generateFlashcards(String userId, String docId) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        return callAiService("http://localhost:8000/documents/" + docId + "/flashcards", body);
+    }
+
+    public ResponseEntity<String> studyMode(String userId, String docId) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        return callAiService("http://localhost:8000/documents/" + docId + "/study", body);
+    }
+
+    public ResponseEntity<String> generateMindMap(String userId, String docId) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        return callAiService("http://localhost:8000/documents/" + docId + "/mind-map", body);
+    }
+
+    private ResponseEntity<String> callAiService(String url, MultiValueMap<String, String> body) {
         try {
-            String url = "http://localhost:8000/conversation";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-            body.add("user_id", userId);
-
             HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<>(body, headers);
-
             return restTemplate.postForEntity(url, requestEntity, String.class);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error starting conversation: " + e.getMessage());
+                    .body("Error calling AI Service at " + url + ": " + e.getMessage());
         }
     }
 }
