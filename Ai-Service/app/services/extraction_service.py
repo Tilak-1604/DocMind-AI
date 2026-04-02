@@ -63,20 +63,64 @@ def run_background_extraction(user_id: str, doc_id: str):
         for i, chunk_text in enumerate(chunks):
             print(f"Extracting data for chunk {i+1}/{len(chunks)}...")
             try:
-                prompt = f"""Extract structured information from the following text.
-You must output ONLY valid JSON that matches the following schema:
+                prompt = f"""You are a precision data extraction specialist. Your task is to analyze the provided text and extract structured information with maximum accuracy and completeness.
+
+**EXTRACTION REQUIREMENTS:**
+
+You must output ONLY valid JSON that matches this exact schema:
+
 {{
-  "chunk_summary": "A brief 2-3 sentence summary of the chunk.",
+  "chunk_summary": "A comprehensive 2-3 sentence summary capturing the main ideas and purpose of this text segment.",
   "key_concepts": [
-    {{"term": "concept name", "definition": "concept definition"}}
+    {{
+      "term": "Precise concept or term name",
+      "definition": "Clear, complete definition with context and relevance"
+    }}
   ],
-  "hierarchical_topics": ["broad topic", "sub-topic", "specific topic"],
-  "important_facts": ["fact 1", "fact 2"]
+  "hierarchical_topics": [
+    "Broad overarching category",
+    "Mid-level sub-topic",
+    "Specific detailed topic"
+  ],
+  "important_facts": [
+    "Critical fact 1 (include numbers, dates, names, or key assertions)",
+    "Critical fact 2",
+    "Critical fact 3"
+  ]
 }}
 
-Text:
+**EXTRACTION GUIDELINES:**
+
+1. **chunk_summary**: 
+   - Capture the essence and main purpose
+   - Include the most significant information
+   - Make it self-contained and understandable alone
+
+2. **key_concepts**: 
+   - Extract 3-7 major concepts or terms
+   - Provide clear, academic-quality definitions
+   - Include context about why each concept matters
+
+3. **hierarchical_topics**: 
+   - Organize from general to specific (3-5 levels)
+   - Create a logical taxonomy of the content
+   - Use clear, descriptive topic names
+
+4. **important_facts**: 
+   - Extract 5-10 critical, exam-worthy facts
+   - Include specific details: numbers, dates, names, formulas
+   - Prioritize verifiable, concrete information
+
+**Quality Standards:**
+- Be thorough and precise
+- Maintain academic rigor
+- Preserve technical accuracy
+- Extract maximum value from every sentence
+
+**Text to Analyze:**
 {chunk_text}
-"""
+
+Output only the JSON, no additional text:"""
                 
                 if not groq_client:
                     print(f"Skipping extraction for chunk {i}: Groq client not initialized.")
@@ -149,16 +193,44 @@ def _generate_global_summary(chunk_summaries: List[str]) -> str:
         
     final_content = "\\n\\n".join(chunk_summaries)
     
-    final_prompt = f"""Create a final structured summary with the following sections:
+    final_prompt = f"""You are an expert document synthesizer. Your task is to create a comprehensive, professionally structured summary from multiple text segments.
 
-1. Executive Summary
-2. Key Points
-3. Important Definitions
-4. Exam Notes
+**MANDATORY OUTPUT STRUCTURE:**
 
-Content:
+# 📊 Executive Summary
+(3-5 sentence high-level overview of the entire document's purpose, scope, and main conclusions)
+
+# 🔑 Key Points
+- **Major Point 1**: [Detailed explanation]
+- **Major Point 2**: [Detailed explanation]  
+- **Major Point 3**: [Detailed explanation]
+- *(Continue for all significant points - aim for 5-8 total)*
+
+# 📖 Important Definitions
+- **[Term 1]**: Precise definition with context
+- **[Term 2]**: Precise definition with context
+- *(List all critical terms and concepts)*
+
+# 🎓 Exam Notes & Critical Information
+- **Must-Know Fact 1**: [Why it's important for exams]
+- **Must-Know Fact 2**: [Why it's important for exams]
+- **Must-Know Fact 3**: [Why it's important for exams]
+- *(Focus on exam-critical, testable information)*
+
+# 💭 Synthesis & Insights
+(How the different parts connect, overarching themes, and broader implications)
+
+**Quality Requirements:**
+- Eliminate redundancy while preserving all unique information
+- Use clear, professional academic language
+- Organize information logically by theme, not by source order
+- Ensure completeness - don't omit important details
+- Make it exam-ready and study-friendly
+
+**Content to Synthesize:**
 {final_content}
-"""
+
+Generate your comprehensive structured summary:"""
     if not groq_client:
         return "Global summary skipped (Groq client not initialized)."
 
@@ -180,13 +252,52 @@ def _generate_mind_map(topics: List[str], doc_id: str) -> str:
     unique_topics = list(set(topics))
     # Basic deduplication and grouping
     
-    prompt = f"""Generate a valid PlantUML mind map structure from the following topics.
-Return ONLY the PlantUML syntax, starting with @startmindmap and ending with @endmindmap.
-Do not use markdown formatting. 
+    prompt = f"""You are a mind map architecture expert. Your task is to transform a list of topics into a clear, well-organized PlantUML mind map structure.
 
-Topics:
+**CRITICAL REQUIREMENTS:**
+
+1. **Output Format**: 
+   - Return ONLY valid PlantUML syntax
+   - Start with @startmindmap
+   - End with @endmindmap
+   - NO markdown code blocks
+   - NO explanatory text
+
+2. **Structure Guidelines**:
+   - Use the document title or main theme as the central node
+   - Organize topics into 3-5 major branches
+   - Group related topics under common parent nodes
+   - Create logical hierarchies (general → specific)
+   - Keep depth to 3-4 levels maximum for readability
+
+3. **Syntax Rules**:
+   - Use * for root node
+   - Use ** for right-side branches
+   - Use *** for right-side sub-branches
+   - Use left_ for left-side branches if needed
+   - Keep node labels concise (2-5 words)
+
+4. **Quality Standards**:
+   - Eliminate duplicate topics
+   - Merge similar or overlapping concepts
+   - Prioritize the most important topics
+   - Create meaningful groupings
+   - Ensure visual balance
+
+**Topics to Organize:**
 {unique_topics}
-"""
+
+**Example Structure:**
+@startmindmap
+* Central Theme
+** Main Category 1
+*** Subcategory 1.1
+*** Subcategory 1.2
+** Main Category 2
+*** Subcategory 2.1
+@endmindmap
+
+Generate the PlantUML mind map now:"""
     if not groq_client:
         return "@startmindmap\n* Mindmap disabled (Groq skipped)\n@endmindmap"
 
