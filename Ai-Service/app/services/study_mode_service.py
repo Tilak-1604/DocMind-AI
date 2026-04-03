@@ -30,53 +30,44 @@ def study_mode(user_id: str, doc_id: str):
     # Limit chunks for safety and token management
     content = "\n\n".join(chunks[:20])
     
-    prompt = f"""You are an expert exam preparation tutor specializing in breaking down complex academic content into clear, memorable study material.
+    prompt = f"""You are an expert tutor who specializes in breaking down complex academic content into clear, easy-to-understand study material.
 
-**Your Task:**
-Transform the provided content into a comprehensive exam-ready explanation that helps students understand, retain, and apply the material.
+Your Task:
+Transform the provided content into a comprehensive explanation that helps students understand, retain, and apply the material effectively.
 
-**MANDATORY OUTPUT STRUCTURE:**
+NON-MANDATORY OUTPUT STRUCTURE: (follow each point only if it adds value and clarity)
 
-**📚 Overview**  
-(2-3 sentence summary of what this content covers and why it's important for exams)
 
-**🎯 Core Concepts**  
-- **[Key Term 1]**: Clear definition with context
-- **[Key Term 2]**: Clear definition with context
-- *(Continue for all major concepts)*
+(Overview 2-3 sentence summary of what this content covers and why it is important to understand)
 
-**📝 Detailed Explanation**  
-(Break down the content in simple, accessible language. Use short paragraphs. Avoid jargon or explain it when necessary.)
+Core Concepts
+[Key Term 1]: Clear definition with context
+[Key Term 2]: Clear definition with context
+(Continue for all major concepts)
 
-**💡 Practical Examples**  
-- Example 1: [Real-world application or scenario]
-- Example 2: [Concrete illustration of the concept]
-- *(Add more if relevant)*
 
-**🔑 Key Takeaways for Exams**  
-- Point 1: [Essential fact to remember]
-- Point 2: [Critical concept to understand]
-- Point 3: [Common exam question topic]
-- *(3-5 points maximum)*
+(Detailed Explanation Break down the content in simple, accessible language. Use short paragraphs. Avoid jargon or explain it when necessary.)
 
-**⚠️ Common Mistakes to Avoid**  
-- Mistake 1: [What students often get wrong]
-- Mistake 2: [Misconception to avoid]
+Practical Examples
+Example 1: [Real-world application or scenario]
+Example 2: [Concrete illustration of the concept]
+(Add more if relevant)
 
-**🧠 Memory Aids**  
-(Mnemonics, acronyms, or simple ways to remember key information)
+Memory Aids (Optional)
+(Mnemonics, analogies, or simple ways to remember key information)
 
-**Tone & Style:**
-- Use simple, conversational language (explain like you're tutoring a friend)
-- Bold important terms and concepts
-- Use analogies when they clarify complex ideas
-- Keep explanations concise but complete
-- Focus on exam-relevant information
+Tone & Style:
 
-**Content to Explain:**
+Use simple, conversational language (explain like you're tutoring a friend)
+Bold important terms and concepts
+Use analogies when they clarify complex ideas
+Keep explanations concise but complete
+Focus on building understanding rather than test performance
+
+Content to Explain:
 {content}
 
-Now generate your exam preparation guide following the exact structure above:"""
+Now generate your study guide following the structure above."""
     
     try:
         response = gemini_client.models.generate_content(
