@@ -4,8 +4,8 @@ from app.db import Base
 class ExtractedChunk(Base):
     __tablename__ = "extracted_chunks"
 
-    id = Column(String(255), primary_key=True, index=True)
-    doc_id = Column(String(255), ForeignKey("documents.id", ondelete="CASCADE"), index=True, nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    doc_id = Column(String(255), ForeignKey("documents.doc_id", ondelete="CASCADE"), index=True, nullable=False)
     user_id = Column(String(255), nullable=False, index=True)
     chunk_index = Column(Integer, nullable=False)
     

@@ -202,9 +202,10 @@ def get_relevant_context(
     question: str,
     user_id: str,
     conversation_id: str,
+    document_ids: list[str] = None
 ):
     print("\n================ RAG ENGINE START ================")
-    print(f"[INPUT] User: {user_id} | Question: {question}")
+    print(f"[INPUT] User: {user_id} | Question: {question} | Docs: {document_ids}")
 
     # ──────────────────────────────────────────
     # Step 1: Load recent messages for history
@@ -232,12 +233,17 @@ def get_relevant_context(
     # Step 4: Pinecone Retrieval + Fallback (Feature 3)
     # ──────────────────────────────────────────
     def run_pinecone_query(top_k: int, threshold: float):
-        results = index.query(
-            namespace=str(user_id),
-            vector=query_embedding,
-            top_k=top_k,
-            include_metadata=True
-        )
+        query_params = {
+            "namespace": str(user_id),
+            "vector": query_embedding,
+            "top_k": top_k,
+            "include_metadata": True
+        }
+        
+        if document_ids:
+            query_params["filter"] = {"doc_id": {"$in": document_ids}}
+
+        results = index.query(**query_params)
         chunks, sources = [], []
         for match in results.get("matches", []):
             if match["score"] >= threshold:

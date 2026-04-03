@@ -12,12 +12,13 @@ def get_db():
         db.close()
 
 
-def create_document(db: Session, doc_id: str, user_id: str, chunk_count: int) -> Document:
+def create_document(db: Session, doc_id: str, user_id: str, chunk_count: int, name: str = None) -> Document:
     """Create a new document record."""
     document = Document(
-        id=doc_id,
+        doc_id=doc_id,
         user_id=user_id,
-        chunk_count=chunk_count
+        chunk_count=chunk_count,
+        name=name
     )
     db.add(document)
     db.commit()
@@ -27,12 +28,12 @@ def create_document(db: Session, doc_id: str, user_id: str, chunk_count: int) ->
 
 def get_document_by_id(db: Session, doc_id: str) -> Document:
     """Get document by ID."""
-    return db.query(Document).filter(Document.id == doc_id).first()
+    return db.query(Document).filter(Document.doc_id == doc_id).first()
 
 
 def get_document_with_owner(db: Session, doc_id: str, user_id: str) -> Document:
     """Get document by ID and validate user ownership."""
     return db.query(Document).filter(
-        Document.id == doc_id,
+        Document.doc_id == doc_id,
         Document.user_id == user_id
     ).first()

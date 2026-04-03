@@ -1,162 +1,172 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Trash2, FileText, List, BookOpen, Brain, FlaskConical } from 'lucide-react';
+import React, { useRef, useEffect } from 'react';
+import { Send, Sparkles, Trash2, Plus, MessageSquare } from 'lucide-react';
 import MessageBubble from './MessageBubble';
-import EmptyState from './EmptyState';
-import { useAuth } from '../../context/AuthContext';
+import DocumentChip from './DocumentChip';
 
-const TypingIndicator = () => (
-    <div className="flex items-end gap-3">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 border border-white/10">
-            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-            </svg>
-        </div>
-        <div className="bg-white/5 border border-white/8 rounded-2xl rounded-bl-sm px-4 py-3">
-            <div className="flex gap-1.5 items-center h-4">
-                {[0, 1, 2].map(i => (
-                    <motion.div
-                        key={i}
-                        className="w-1.5 h-1.5 bg-indigo-400 rounded-full"
-                        animate={{ y: [0, -5, 0] }}
-                        transition={{ duration: 0.6, delay: i * 0.15, repeat: Infinity }}
-                    />
-                ))}
-            </div>
-        </div>
-    </div>
-);
-
-const AI_TOOLS = [
-    { label: 'Summarize', icon: List, tool: 'summarize' },
-    { label: 'Flashcards', icon: BookOpen, tool: 'flashcards' },
-    { label: 'Study Mode', icon: FlaskConical, tool: 'study' },
-    { label: 'Mind Map', icon: Brain, tool: 'mind-map' },
-];
-
-const ChatArea = ({ messages, isProcessing, selectedDoc, onSendMessage, onRunTool, onClearChat, inputValue, setInputValue }) => {
-    const chatEndRef = useRef(null);
-    const { user } = useAuth();
+const ChatArea = ({ 
+    messages, 
+    isProcessing, 
+    selectedDocuments = [], 
+    onSendMessage, 
+    onRunTool, 
+    onClearChat,
+    onAddMoreDocs,
+    onRemoveDoc,
+    inputValue, 
+    setInputValue 
+}) => {
+    const scrollRef = useRef(null);
 
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isProcessing]);
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            onSendMessage(e);
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    };
+    }, [messages]);
+
+    const hasDocs = selectedDocuments.length > 0;
 
     return (
-        <main className="flex-1 flex flex-col overflow-hidden">
-            {/* Header */}
-            <header className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-white/5 bg-black/10 backdrop-blur-sm">
-                <div className="flex items-center gap-2.5">
-                    {selectedDoc ? (
+        <div className="flex flex-col h-full relative">
+            {/* Header / Document Chips */}
+            <div className="px-6 py-4 flex items-center justify-between border-b border-white/5 bg-[#16161e]/50 backdrop-blur-md z-10">
+                <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
+                    {selectedDocuments.length > 0 ? (
                         <>
-                            <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center">
-                                <FileText className="w-4 h-4 text-indigo-400" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-semibold text-white leading-tight truncate max-w-[250px]">{selectedDoc.name}</p>
-                                <p className="text-[10px] text-indigo-400">Ready to chat</p>
-                            </div>
+                            {selectedDocuments.map((doc) => (
+                                <DocumentChip 
+                                    key={doc.id} 
+                                    name={doc.name} 
+                                    onRemove={() => onRemoveDoc(doc.id)} 
+                                />
+                            ))}
+                            <button 
+                                onClick={onAddMoreDocs}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-dashed border-white/20 text-white/40 hover:text-white/80 hover:border-white/40 hover:bg-white/5 transition-all text-sm font-medium whitespace-nowrap"
+                            >
+                                <Plus size={14} />
+                                Add
+                            </button>
                         </>
                     ) : (
-                        <div>
-                            <p className="text-sm font-semibold text-gray-400">No document selected</p>
-                            <p className="text-[10px] text-gray-600">Upload a PDF to begin</p>
+                        <div className="flex items-center gap-2 text-white/20 italic text-sm">
+                            <MessageSquare size={14} />
+                            <span>No documents selected</span>
                         </div>
                     )}
                 </div>
 
-                {/* AI Tool Buttons */}
-                <div className="flex items-center gap-1">
-                    {AI_TOOLS.map(({ label, icon: Icon, tool }) => (
-                        <button
-                            key={tool}
-                            onClick={() => onRunTool(tool, label)}
-                            disabled={!selectedDoc || isProcessing}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 border border-transparent hover:border-white/10"
-                            title={label}
-                        >
-                            <Icon className="w-3.5 h-3.5" />
-                            <span className="hidden lg:inline">{label}</span>
-                        </button>
-                    ))}
-                    {messages.length > 0 && (
-                        <button
-                            onClick={onClearChat}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:bg-red-500/10 hover:text-red-400 transition-all duration-150 border border-transparent ml-1"
-                            title="Clear chat"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                    )}
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={onClearChat}
+                        className="p-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-red-400 transition-all group"
+                        title="Clear Chat"
+                    >
+                        <Trash2 size={18} />
+                    </button>
                 </div>
-            </header>
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-                {messages.length === 0 ? (
-                    <EmptyState
-                        hasDocument={!!selectedDoc}
-                        onSuggestionClick={(text) => {
-                            setInputValue(text);
-                        }}
-                    />
-                ) : (
-                    <>
-                        {messages.map((msg, i) => (
-                            <MessageBubble
-                                key={i}
-                                message={msg}
-                                userPicture={user?.picture}
-                                userName={user?.name}
-                            />
-                        ))}
-                        {isProcessing && <TypingIndicator />}
-                    </>
-                )}
-                <div ref={chatEndRef} />
             </div>
 
-            {/* Input Bar */}
-            <div className="flex-shrink-0 px-6 py-4 border-t border-white/5 bg-black/10">
-                <form onSubmit={onSendMessage} className="flex items-end gap-3 max-w-4xl mx-auto">
-                    <div className="flex-1 relative">
-                        <textarea
-                            rows={1}
-                            placeholder={selectedDoc ? 'Ask anything about your document...' : 'Upload a document to start asking questions'}
-                            disabled={!selectedDoc || isProcessing}
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            className="w-full input-field pr-4 resize-none overflow-hidden leading-relaxed disabled:opacity-40 disabled:cursor-not-allowed"
-                            style={{ minHeight: '44px', maxHeight: '120px' }}
-                            onInput={(e) => {
-                                e.target.style.height = 'auto';
-                                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-                            }}
-                        />
+            {/* Messages Area */}
+            <div 
+                ref={scrollRef}
+                className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth scrollbar-thin"
+            >
+                {messages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto animate-in fade-in zoom-in duration-700">
+                        <div className="w-20 h-20 bg-blue-500/10 rounded-3xl flex items-center justify-center mb-6 border border-blue-500/20">
+                            <Sparkles className="text-blue-400 w-10 h-10" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-white mb-3">
+                            {hasDocs ? 'How can I help you today?' : 'Select documents first'}
+                        </h2>
+                        <p className="text-white/40 leading-relaxed">
+                            {hasDocs 
+                                ? `I've analyzed your ${selectedDocuments.length} document${selectedDocuments.length !== 1 ? 's' : ''}. Ask me for a summary, explain concepts, or find specific details.` 
+                                : 'You need to select at least one document from your library before we can start chatting.'}
+                        </p>
+                        {!hasDocs && (
+                            <button
+                                onClick={onAddMoreDocs}
+                                className="mt-6 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
+                            >
+                                <Plus size={18} />
+                                Select Documents
+                            </button>
+                        )}
                     </div>
-                    <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        type="submit"
-                        disabled={!selectedDoc || !inputValue.trim() || isProcessing}
-                        className="w-11 h-11 flex-shrink-0 bg-indigo-600 hover:bg-indigo-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200"
+                ) : (
+                    messages.map((msg, idx) => (
+                        <MessageBubble key={idx} message={msg} />
+                    ))
+                )}
+                {isProcessing && (
+                    <div className="flex gap-4 animate-pulse">
+                        <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 shrink-0" />
+                        <div className="space-y-2 flex-1 pt-2">
+                            <div className="h-2 bg-white/10 rounded w-1/4" />
+                            <div className="h-2 bg-white/5 rounded w-3/4" />
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* AI Tools Strip */}
+            {hasDocs && (
+                <div className="px-6 py-3 border-t border-white/5 bg-white/[0.02] flex items-center gap-3 overflow-x-auto no-scrollbar">
+                    <button
+                        onClick={() => onRunTool('summarize', 'Summary')}
+                        disabled={isProcessing}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-50 transition-all text-sm font-medium whitespace-nowrap"
                     >
-                        <Send className="w-4 h-4" />
-                    </motion.button>
+                        <Sparkles size={14} className="text-yellow-400" />
+                        Summarize
+                    </button>
+                    <button
+                        onClick={() => onRunTool('flashcards', 'Flashcards')}
+                        disabled={isProcessing}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-50 transition-all text-sm font-medium whitespace-nowrap"
+                    >
+                        <Sparkles size={14} className="text-purple-400" />
+                        Flashcards
+                    </button>
+                    <button
+                        onClick={() => onRunTool('mind-map', 'Mind Map')}
+                        disabled={isProcessing}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-50 transition-all text-sm font-medium whitespace-nowrap"
+                    >
+                        <Sparkles size={14} className="text-cyan-400" />
+                        Mind Map
+                    </button>
+                </div>
+            )}
+
+            {/* Input Area */}
+            <div className="p-6 pt-2">
+                <form 
+                    onSubmit={onSendMessage}
+                    className={`relative flex items-center transition-all ${!hasDocs ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                    <input
+                        type="text"
+                        placeholder={hasDocs ? "Ask something about your documents..." : "Select documents to start chatting"}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl pl-6 pr-16 py-4 text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all hover:bg-white/[0.08]"
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        disabled={!hasDocs || isProcessing}
+                    />
+                    <button
+                        type="submit"
+                        disabled={!inputValue.trim() || isProcessing || !hasDocs}
+                        className="absolute right-3 p-2 bg-blue-600 hover:bg-blue-500 disabled:bg-white/10 text-white disabled:text-white/20 rounded-xl transition-all shadow-lg shadow-blue-500/20"
+                    >
+                        <Send size={20} />
+                    </button>
                 </form>
-                <p className="text-center text-[10px] text-gray-700 mt-2">
-                    DocMindAI can make mistakes. Verify important information independently.
+                <p className="text-center text-[10px] text-white/20 mt-4 uppercase tracking-widest font-medium">
+                    DocMind AI • Secure RAG Intelligence
                 </p>
             </div>
-        </main>
+        </div>
     );
 };
 

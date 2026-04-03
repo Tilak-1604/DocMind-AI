@@ -5,8 +5,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pinecone import Pinecone
 from google import genai
 from app.core.config import settings
-from app.repositories.document_repository import create_document
-from app.db import SessionLocal
 
 # 🔹 Initialize Gemini
 gemini_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
@@ -60,14 +58,14 @@ def process_pdf_to_pinecone(file_path: str, doc_id: str, user_id: str, document_
                         "text": chunk,
                         "document_name": document_name,
                         "page_number": page_num,
-                        "user_id": str(user_id)
+                        "user_id": str(user_id),
+                        "doc_id": str(doc_id)
                     }
                 })
 
                 total_chunks += 1
 
-    # 5️⃣ Upsert to Pinecone
-    # Pinecone upserts must be done in batches to avoid payload size limits (batch of 100)
+    # 5️⃣ Upsert to Pinecone in batches
     batch_size = 100
     for i in range(0, len(vectors), batch_size):
         batch = vectors[i:i + batch_size]
@@ -78,15 +76,6 @@ def process_pdf_to_pinecone(file_path: str, doc_id: str, user_id: str, document_
         print(f"Upserted batch of {len(batch)} vectors to Pinecone...")
 
     print("Total vectors upserted to Pinecone:", total_chunks)
-
-    # 6️⃣ Save document metadata to database
-    db = SessionLocal()
-    try:
-        create_document(db, doc_id, user_id, total_chunks)
-        print("Document metadata saved to database")
-    finally:
-        db.close()
-
     print("==========================================\n")
 
     return total_chunks

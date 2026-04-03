@@ -69,7 +69,7 @@ async def upload_document(
                 existing_doc.chunk_count = chunk_count
                 db.commit()
             else:
-                create_document(db, doc_id, user_id, chunk_count)
+                create_document(db, doc_id, user_id, chunk_count, name=file.filename)
 
         except Exception as e:
             db.rollback()
@@ -106,12 +106,16 @@ async def start_conversation(user_id: str = Form(...)):
 async def chat(
     user_id: str = Form(...),
     conversation_id: str = Form(...),
-    question: str = Form(...)
+    question: str = Form(...),
+    document_ids: str = Form(None)
 ):
+    doc_id_list = document_ids.split(",") if document_ids else None
+    
     result = get_relevant_context(
         question=question,
         user_id=user_id,
-        conversation_id=conversation_id
+        conversation_id=conversation_id,
+        document_ids=doc_id_list
     )
 
     return {

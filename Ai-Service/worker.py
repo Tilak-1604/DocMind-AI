@@ -49,8 +49,16 @@ def start_worker():
                 conversation_id = data.get("conversation_id")
                 doc_id = data.get("doc_id")
                 question = data.get("question")
+                document_ids_raw = data.get("document_ids")
+                
+                # Normalize document_ids to a list
+                document_ids = None
+                if isinstance(document_ids_raw, list):
+                    document_ids = document_ids_raw
+                elif isinstance(document_ids_raw, str):
+                    document_ids = document_ids_raw.split(",") if document_ids_raw else None
 
-                print(f"\n[REQUEST] ID: {request_id} | Action: {action} | User: {user_id} | Doc: {doc_id}")
+                print(f"\n[REQUEST] ID: {request_id} | Action: {action} | User: {user_id} | Docs: {document_ids or doc_id}")
                 
                 answer = ""
                 sources = []
@@ -62,7 +70,8 @@ def start_worker():
                         result = get_relevant_context(
                             question=question,
                             user_id=user_id,
-                            conversation_id=conversation_id
+                            conversation_id=conversation_id,
+                            document_ids=document_ids
                         )
                         answer = result.get("answer", "")
                         sources = result.get("sources", [])
