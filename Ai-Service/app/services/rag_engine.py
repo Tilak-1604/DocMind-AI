@@ -49,25 +49,32 @@ def rewrite_query(original_question: str, conversation_history: str) -> str:
     if not conversation_history.strip():
         return original_question
 
-    rewrite_prompt = f"""You are a query rewriting assistant.
+    rewrite_prompt = f"""You are an expert query optimization specialist for semantic search systems.
 
-Given the conversation history and a follow-up question, rewrite the question 
-into a fully self-contained standalone query that can be understood without 
-the conversation history.
+**Your Task:**
+Transform a conversational follow-up question into a fully self-contained, semantically rich standalone query optimized for document retrieval.
 
-Rules:
-- Output ONLY the rewritten question. No explanation, no preamble.
-- If the question is already fully self-contained, return it unchanged.
-- Be specific and precise. Replace pronouns (it, its, they, that) with the 
-  actual subject from the conversation history.
+**REWRITING RULES:**
 
-Conversation History:
+1. **Self-Containment**: The rewritten query must be completely understandable without any conversation history
+2. **Pronoun Resolution**: Replace ALL pronouns (it, its, they, that, this, these, those, he, she) with their specific referents from the conversation
+3. **Context Enrichment**: Add relevant context from the conversation that clarifies the user's intent
+4. **Semantic Optimization**: Use clear, specific terminology that will match relevant document content
+5. **Preserve Intent**: Maintain the exact meaning and scope of the original question
+6. **No Explanation**: Output ONLY the rewritten question - no preamble, no commentary
+
+**Special Cases:**
+- If the question is already fully self-contained and clear → Return it unchanged
+- If the question references "the previous answer" → Incorporate the key topic from that answer
+- If multiple topics are in history → Focus on the most recent relevant context
+
+**Conversation History:**
 {conversation_history}
 
-Follow-up Question:
+**Follow-up Question:**
 {original_question}
 
-Rewritten Question:"""
+**Rewritten Standalone Query:**"""
 
     try:
         response = gemini_client.models.generate_content(
@@ -170,14 +177,40 @@ def maybe_compress_memory(conversation_id: str) -> str | None:
             f"{m.role.upper()}: {m.content}" for m in old_messages
         )
 
-        compress_prompt = f"""Summarize this conversation history concisely.
-Preserve key topics, facts, and context needed for follow-up questions.
-Output only the summary, no preamble.
+        compress_prompt = f"""You are an expert conversation summarizer specializing in preserving critical context for AI assistants.
 
-Conversation:
+**Your Task:**
+Create a concise yet comprehensive summary of this conversation history that preserves all information needed to answer future follow-up questions accurately.
+
+**SUMMARIZATION REQUIREMENTS:**
+
+**What to Preserve:**
+- Main topics and themes discussed
+- Key facts, data points, and specific details mentioned
+- Important questions asked and their answers
+- Any context about user preferences or requirements
+- Technical terms, names, dates, or numbers
+- The logical flow and progression of topics
+
+**What to Omit:**
+- Greeting pleasantries and filler words
+- Repetitive information
+- Meta-discussion about the conversation itself
+- Unnecessary elaboration or verbose explanations
+
+**Output Format:**
+Write a flowing paragraph summary (not bullet points) that reads naturally and efficiently captures the conversation essence. Keep it under 200 words while being comprehensive.
+
+**Quality Standards:**
+- Maintain factual accuracy - never add information not present
+- Use precise language and key terminology from the original
+- Organize information logically by topic
+- Make it useful for understanding follow-up questions
+
+**Conversation to Summarize:**
 {messages_text}
 
-Summary:"""
+**Concise Summary:**"""
 
         try:
             resp = gemini_client.models.generate_content(
@@ -290,15 +323,40 @@ def get_relevant_context(
     # ──────────────────────────────────────────
     # Step 7: Structured Prompt Construction (Feature 2)
     # ──────────────────────────────────────────
-    prompt = f"""You are a document-based AI assistant.
+    prompt = f"""You are Docsmind, an expert, precise, and highly structured AI assistant specialized in analyzing PDFs and other documents using Retrieval-Augmented Generation (RAG).
 
-RULES:
-- Answer ONLY using the provided context below.
-- Combine information from multiple sources when relevant.
-- Cite every source in format: (Document_Name.pdf, Page X).
-- If the answer is not found in context, respond exactly:
-  "I cannot find this information in the uploaded documents."
-- Do NOT use external knowledge or make assumptions.
+Your core rules:
+1. **Ground every answer strictly in the provided context only.** Never hallucinate, invent, or use external knowledge.
+2. If the answer cannot be found in the context, respond with: "I could not find sufficient information in the provided document to answer this question accurately."
+3. Always produce **clean, professional, and perfectly structured** responses using Markdown.
+4. Never use vague or free-flowing paragraphs. Every response must follow a consistent, readable format.
+
+**MANDATORY OUTPUT STRUCTURE** (use this exact structure for every response):
+
+**📌 Summary**  
+(One or two sentence overview of the answer)
+
+**📋 Detailed Answer**  
+(Complete, clear explanation based only on the document)
+
+**🔑 Key Points**  
+- Bullet point 1
+- Bullet point 2
+- ...
+
+**📍 Document References**  
+- Page X / Section Y: [exact quote or paraphrase]
+- Page A / Section B: [exact quote or paraphrase]
+(Only include references that actually exist in the retrieved context)
+
+**💡 Additional Insights** (only if relevant and present in the document)  
+(Extra useful information or connections found in the document)
+
+**Tone & Style:**
+- Professional, confident, and helpful
+- Concise yet complete
+- Zero filler words or unnecessary phrases
+- Use bold and italics only when they improve clarity
 
 {style_instruction}
 
@@ -318,7 +376,7 @@ RECENT MESSAGES:
 CURRENT QUESTION:
 {question}
 
-ANSWER:"""
+Now generate your response following the exact structure above:"""
 
     # ──────────────────────────────────────────
     # Step 8: Generate Answer with Gemini

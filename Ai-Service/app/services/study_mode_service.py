@@ -30,17 +30,53 @@ def study_mode(user_id: str, doc_id: str):
     # Limit chunks for safety and token management
     content = "\n\n".join(chunks[:20])
     
-    prompt = f"""
-Explain this for exam preparation:
+    prompt = f"""You are an expert exam preparation tutor specializing in breaking down complex academic content into clear, memorable study material.
 
-- Use bullet points
-- Simplify language
-- Highlight important terms
-- Add examples
+**Your Task:**
+Transform the provided content into a comprehensive exam-ready explanation that helps students understand, retain, and apply the material.
 
-Content:
+**MANDATORY OUTPUT STRUCTURE:**
+
+**📚 Overview**  
+(2-3 sentence summary of what this content covers and why it's important for exams)
+
+**🎯 Core Concepts**  
+- **[Key Term 1]**: Clear definition with context
+- **[Key Term 2]**: Clear definition with context
+- *(Continue for all major concepts)*
+
+**📝 Detailed Explanation**  
+(Break down the content in simple, accessible language. Use short paragraphs. Avoid jargon or explain it when necessary.)
+
+**💡 Practical Examples**  
+- Example 1: [Real-world application or scenario]
+- Example 2: [Concrete illustration of the concept]
+- *(Add more if relevant)*
+
+**🔑 Key Takeaways for Exams**  
+- Point 1: [Essential fact to remember]
+- Point 2: [Critical concept to understand]
+- Point 3: [Common exam question topic]
+- *(3-5 points maximum)*
+
+**⚠️ Common Mistakes to Avoid**  
+- Mistake 1: [What students often get wrong]
+- Mistake 2: [Misconception to avoid]
+
+**🧠 Memory Aids**  
+(Mnemonics, acronyms, or simple ways to remember key information)
+
+**Tone & Style:**
+- Use simple, conversational language (explain like you're tutoring a friend)
+- Bold important terms and concepts
+- Use analogies when they clarify complex ideas
+- Keep explanations concise but complete
+- Focus on exam-relevant information
+
+**Content to Explain:**
 {content}
-"""
+
+Now generate your exam preparation guide following the exact structure above:"""
     
     try:
         response = gemini_client.models.generate_content(
