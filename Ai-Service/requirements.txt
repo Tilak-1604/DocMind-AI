@@ -1,6 +1,6 @@
 # Web Framework
 fastapi==0.115.0
-uvicorn==0.30.0
+uvicorn[standard]==0.30.0  # Includes uvloop for better performance
 
 # AI / LLM
 google-genai==1.64.0

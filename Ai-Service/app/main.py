@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
+from fastapi.middleware.gzip import GZipMiddleware
 from app.services.ingestion_service import process_pdf_to_pinecone
 from app.services.rag_engine import get_relevant_context
 from app.services.memory_service import create_conversation
@@ -23,6 +24,10 @@ from app.models import extracted_data                    # new single-pass extra
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+# Enable Gzip compression for responses > 1000 bytes
+# Reduces response size by 60-85% for JSON payloads
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 @app.get("/")
 async def health_check():

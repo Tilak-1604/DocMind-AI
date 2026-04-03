@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime
+from sqlalchemy import Column, String, DateTime, Index
 from sqlalchemy.sql import func
 from app.db import Base
 
@@ -7,5 +7,10 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String(255), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    user_id = Column(String(255), nullable=False, index=True)  # Index for user lookup
+    created_at = Column(DateTime, server_default=func.now(), index=True)  # Index for time-based queries
+    
+    # Composite index for common query: fetch user's conversations ordered by time
+    __table_args__ = (
+        Index('idx_user_created', 'user_id', 'created_at'),
+    )
