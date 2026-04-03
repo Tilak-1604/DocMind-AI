@@ -28,8 +28,22 @@ const ChatArea = ({
     return (
         <div className="flex flex-col h-full relative">
             {/* Header / Document Chips */}
-            <div className="px-6 py-4 flex items-center justify-between border-b border-white/5 bg-[#16161e]/50 backdrop-blur-md z-10">
-                <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
+            <div className="px-6 py-4 flex flex-col gap-2 border-b border-white/5 bg-[#16161e]/50 backdrop-blur-md z-10">
+                <div className="flex items-center justify-between">
+                    <span className="text-xs text-white/40 font-medium">
+                        {hasDocs ? `Using ${selectedDocuments.length} document${selectedDocuments.length !== 1 ? 's' : ''}` : 'No context selected'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={onClearChat}
+                            className="p-1.5 rounded-xl hover:bg-white/5 text-white/30 hover:text-red-400 transition-all group"
+                            title="Clear Chat"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
                     {selectedDocuments.length > 0 ? (
                         <>
                             {selectedDocuments.map((doc) => (
@@ -54,17 +68,8 @@ const ChatArea = ({
                         </div>
                     )}
                 </div>
-
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={onClearChat}
-                        className="p-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-red-400 transition-all group"
-                        title="Clear Chat"
-                    >
-                        <Trash2 size={18} />
-                    </button>
-                </div>
             </div>
+
 
             {/* Messages Area */}
             <div 
@@ -112,31 +117,38 @@ const ChatArea = ({
 
             {/* AI Tools Strip */}
             {hasDocs && (
-                <div className="px-6 py-3 border-t border-white/5 bg-white/[0.02] flex items-center gap-3 overflow-x-auto no-scrollbar">
-                    <button
-                        onClick={() => onRunTool('summarize', 'Summary')}
-                        disabled={isProcessing}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-50 transition-all text-sm font-medium whitespace-nowrap"
-                    >
-                        <Sparkles size={14} className="text-yellow-400" />
-                        Summarize
-                    </button>
-                    <button
-                        onClick={() => onRunTool('flashcards', 'Flashcards')}
-                        disabled={isProcessing}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-50 transition-all text-sm font-medium whitespace-nowrap"
-                    >
-                        <Sparkles size={14} className="text-purple-400" />
-                        Flashcards
-                    </button>
-                    <button
-                        onClick={() => onRunTool('mind-map', 'Mind Map')}
-                        disabled={isProcessing}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-50 transition-all text-sm font-medium whitespace-nowrap"
-                    >
-                        <Sparkles size={14} className="text-cyan-400" />
-                        Mind Map
-                    </button>
+                <div className="px-6 py-3 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
+                    <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
+                        <button
+                            onClick={() => onRunTool('summarize', 'Summary')}
+                            disabled={isProcessing}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-50 transition-all text-sm font-medium whitespace-nowrap"
+                        >
+                            <Sparkles size={14} className="text-yellow-400" />
+                            Summarize
+                        </button>
+                        <button
+                            onClick={() => onRunTool('flashcards', 'Flashcards')}
+                            disabled={isProcessing}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-50 transition-all text-sm font-medium whitespace-nowrap"
+                        >
+                            <Sparkles size={14} className="text-purple-400" />
+                            Flashcards
+                        </button>
+                        <button
+                            onClick={() => onRunTool('mind-map', 'Mind Map')}
+                            disabled={isProcessing}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-50 transition-all text-sm font-medium whitespace-nowrap"
+                        >
+                            <Sparkles size={14} className="text-cyan-400" />
+                            Mind Map
+                        </button>
+                    </div>
+                    {selectedDocuments.length > 1 && (
+                        <span className="text-[10px] text-white/30 hidden sm:block italic">
+                            *Tools currently work on the first document
+                        </span>
+                    )}
                 </div>
             )}
 

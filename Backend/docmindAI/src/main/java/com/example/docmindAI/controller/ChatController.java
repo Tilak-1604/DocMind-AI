@@ -143,6 +143,52 @@ public class ChatController {
         log.info("Chat session {} deleted", sessionId);
         return ResponseEntity.ok(Map.of("message", "Session deleted"));
     }
+
+    // Update documents mapped to a chat session
+    @PutMapping("/{sessionId}/documents")
+    public ResponseEntity<?> updateSessionDocuments(@PathVariable Long sessionId,
+                                                    @RequestBody UpdateSessionDocumentsRequest request,
+                                                    @AuthenticationPrincipal User user) {
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        
+        String userId = user.getId() != null ? user.getId().toString() : user.getEmail();
+
+        if (request.getDocumentIds() == null || request.getDocumentIds().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Document list cannot be empty"));
+        }
+
+        var sessionOpt = chatSessionRepository.findById(sessionId);
+        if (sessionOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        ChatSession session = sessionOpt.get();
+        if (!session.getUserId().equals(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Unauthorized access to session"));
+        }
+
+        List<Document> docs = documentRepository.findAllById(request.getDocumentIds());
+        if (docs.size() != request.getDocumentIds().size()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Some documents were not found"));
+        }
+        
+        for (Document doc : docs) {
+            if (!doc.getUserId().equals(userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Unauthorized access to document: " + doc.getName()));
+            }
+        }
+
+        session.setDocuments(docs);
+        chatSessionRepository.save(session);
+        log.info("Chat session {} documents updated by user {}", sessionId, userId);
+        
+        return ResponseEntity.ok(Map.of(
+            "message", "Context updated",
+            "documents", docs
+        ));
+    }
 }
 
 @Data
@@ -156,4 +202,9 @@ class CreateSessionRequest {
 class SaveMessageRequest {
     private String role;
     private String content;
+}
+
+@Data
+class UpdateSessionDocumentsRequest {
+    private List<Long> documentIds;
 }

@@ -23,6 +23,7 @@ const Dashboard = () => {
     const [allDocuments, setAllDocuments] = useState([]);
     const [selectedDocuments, setSelectedDocuments] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [documentModalMode, setDocumentModalMode] = useState('new'); // 'new' | 'update'
 
     // Redirect if unauthenticated
     useEffect(() => {
@@ -135,7 +136,21 @@ const Dashboard = () => {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            toast.success(`"${file.name}" uploaded successfully!`, { id: toastId });
+            toast((t) => (
+                <div className="flex flex-col gap-2">
+                    <span className="font-semibold text-white">"{file.name}" uploaded successfully!</span>
+                    <button 
+                        onClick={() => {
+                            toast.dismiss(t.id);
+                            setDocumentModalMode('new');
+                            setIsModalOpen(true);
+                        }}
+                        className="px-3 py-1.5 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded-lg text-sm font-medium transition-colors border border-blue-500/20 w-full"
+                    >
+                        Start Chat with this document
+                    </button>
+                </div>
+            ), { id: toastId, duration: 5000 });
             loadAllDocuments(); // Refresh the list
         } catch (err) {
             console.error('Upload error:', err);
@@ -243,21 +258,88 @@ const Dashboard = () => {
     };
 
     const handleNewChat = () => {
+        setDocumentModalMode('new');
         setIsModalOpen(true);
+    };
+
+    const updateChatDocuments = async (newDocs) => {
+        if (!activeSession) return;
+        if (newDocs.length === 0) {
+            toast.error('Cannot update with empty document list.');
+            return;
+        }
+
+        // The modal returns the exact deduplicated final list of documents based on ID selection.
+        const mergedIds = Array.from(new Set(newDocs.map(d => d.id)));
+        const finalDocs = allDocuments.filter(d => mergedIds.includes(d.id));
+
+        try {
+            const res = await api.put(`/api/chats/${activeSession.id}/documents`, {
+                documentIds: mergedIds
+            });
+            
+            setSelectedDocuments(finalDocs);
+            const systemMsg = { role: 'system', content: 'Context updated. New responses will use updated documents.' };
+            setMessages(prev => [...prev, systemMsg]);
+            
+            toast.success('Context updated', {
+                icon: '🔄',
+                style: { borderRadius: '10px', background: '#333', color: '#fff' }
+            });
+        } catch (err) {
+            console.error('Failed to update chat context', err);
+            toast.error(err.response?.data?.error || 'Failed to update document context.');
+        }
     };
 
     const handleConfirmSelection = async (docs) => {
-        await createNewSession(docs);
+        if (documentModalMode === 'new') {
+            await createNewSession(docs);
+        } else {
+            await updateChatDocuments(docs);
+        }
     };
 
     const handleAddMoreDocs = () => {
+        setDocumentModalMode('update');
         setIsModalOpen(true);
     };
 
-    const handleRemoveDoc = (docId) => {
-        const updated = selectedDocuments.filter(d => d.id !== docId);
-        setSelectedDocuments(updated);
-        // Bonus: In a real app we might want to update the ChatSession entity in DB too
+    const handleRemoveDoc = async (docId) => {
+        if (!activeSession) return;
+        
+        const remainingDocs = selectedDocuments.filter(d => d.id !== docId);
+        
+        if (remainingDocs.length === 0) {
+            if (!window.confirm("Removing this will disable chat. Continue?")) {
+                return;
+            }
+        }
+
+        if (remainingDocs.length === 0) {
+            // Cannot clear via PUT (rejected by backend), we just visually clear and chat is disabled
+            setSelectedDocuments([]);
+            toast('Context cleared. Chat disabled.', { icon: '⚠️' });
+            return;
+        }
+
+        try {
+            const mergedIds = remainingDocs.map(d => d.id);
+            await api.put(`/api/chats/${activeSession.id}/documents`, {
+                documentIds: mergedIds
+            });
+            
+            setSelectedDocuments(remainingDocs);
+            const systemMsg = { role: 'system', content: 'Context updated. New responses will use updated documents.' };
+            setMessages(prev => [...prev, systemMsg]);
+            
+            toast.success(`Context updated: ${remainingDocs.length} documents remaining`, {
+                icon: '🗑️',
+                style: { borderRadius: '10px', background: '#333', color: '#fff' }
+            });
+        } catch (err) {
+            toast.error('Failed to remove document.');
+        }
     };
 
     return (
@@ -288,10 +370,11 @@ const Dashboard = () => {
 
             <DocumentSelectorModal
                 isOpen={isModalOpen}
+                mode={documentModalMode}
                 onClose={() => setIsModalOpen(false)}
                 documents={allDocuments}
                 onConfirm={handleConfirmSelection}
-                initialSelectedIds={selectedDocuments.map(d => d.id)}
+                initialSelectedIds={documentModalMode === 'new' ? [] : selectedDocuments.map(d => d.id)}
             />
         </div>
     );

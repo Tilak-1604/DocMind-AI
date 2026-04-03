@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, FileText, Check, Plus } from 'lucide-react';
 
-const DocumentSelectorModal = ({ isOpen, onClose, documents, onConfirm, initialSelectedIds = [] }) => {
+const DocumentSelectorModal = ({ isOpen, mode = 'new', onClose, documents, onConfirm, initialSelectedIds = [] }) => {
     const [selectedIds, setSelectedIds] = useState(initialSelectedIds);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -128,7 +128,7 @@ const DocumentSelectorModal = ({ isOpen, onClose, documents, onConfirm, initialS
                                     : 'bg-white/5 text-white/20 cursor-not-allowed shadow-none'
                             }`}
                         >
-                            Start Chat
+                            {mode === 'update' ? 'Update Context' : 'Start Chat'}
                         </button>
                     </div>
                 </div>
