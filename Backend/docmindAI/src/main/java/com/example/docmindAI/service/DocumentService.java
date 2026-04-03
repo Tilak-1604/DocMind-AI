@@ -1,0 +1,162 @@
+package com.example.docmindAI.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+
+import com.example.docmindAI.model.Document;
+import org.springframework.web.client.RestTemplate;
+
+@Service
+public class DocumentService {
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    @Autowired
+    private com.example.docmindAI.repository.DocumentRepository documentRepository;
+
+    private static final String AI_SERVICE_URL = "http://localhost:8000/upload";
+
+    public Document saveDocument(String userId, String docId, String fileName) {
+        Document doc = Document.builder()
+                .userId(userId)
+                .docId(docId)
+                .name(fileName)
+                .build();
+        return documentRepository.save(doc);
+    }
+
+    public java.util.List<Document> listDocuments(String userId) {
+        return documentRepository.findByUserIdOrderByUploadDateDesc(userId);
+    }
+
+    public ResponseEntity<String> uploadToAiService(MultipartFile file, String userId, String docId) {
+        try {
+            // Prepare headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+            // Prepare body
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("user_id", userId);
+            body.add("doc_id", docId);
+
+            // Convert MultipartFile to a Resource that RestTemplate can send
+            ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
+                @Override
+                public String getFilename() {
+                    return file.getOriginalFilename();
+                }
+            };
+            body.add("file", resource);
+
+            HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
+            // POST to Python AI-Service
+            return restTemplate.postForEntity(AI_SERVICE_URL, requestEntity, String.class);
+
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("File processing error: " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("AI-Service Connection Error: " + e.getMessage());
+        }
+    }
+
+    public ResponseEntity<String> startConversation(String userId) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        return callAiService("http://localhost:8000/conversation", body);
+    }
+
+    public ResponseEntity<String> chat(String userId, String conversationId, String question, java.util.List<String> documentIds) {
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        body.add("conversation_id", conversationId);
+        body.add("question", question);
+        
+        if (documentIds != null && !documentIds.isEmpty()) {
+            body.add("document_ids", String.join(",", documentIds));
+        }
+
+        return callAiServiceMultipart("http://localhost:8000/chat", body);
+    }
+
+    public ResponseEntity<String> summarize(String userId, String docId) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        return callAiService("http://localhost:8000/documents/" + docId + "/summarize", body);
+    }
+
+    public ResponseEntity<String> generateFlashcards(String userId, String docId) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        return callAiService("http://localhost:8000/documents/" + docId + "/flashcards", body);
+    }
+
+    public ResponseEntity<String> studyMode(String userId, String docId) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        return callAiService("http://localhost:8000/documents/" + docId + "/study", body);
+    }
+
+    public ResponseEntity<String> generateMindMap(String userId, String docId) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        return callAiService("http://localhost:8000/documents/" + docId + "/mind-map", body);
+    }
+
+    public ResponseEntity<String> generateExam(String userId, String docId, Integer marks1, Integer marks2, Integer marks5, Integer marks10) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        
+        // Add optional parameters with defaults
+        if (marks1 != null) {
+            body.add("marks_1", String.valueOf(marks1));
+        }
+        if (marks2 != null) {
+            body.add("marks_2", String.valueOf(marks2));
+        }
+        if (marks5 != null) {
+            body.add("marks_5", String.valueOf(marks5));
+        }
+        if (marks10 != null) {
+            body.add("marks_10", String.valueOf(marks10));
+        }
+        
+        return callAiService("http://localhost:8000/documents/" + docId + "/exam", body);
+    }
+
+    private ResponseEntity<String> callAiService(String url, MultiValueMap<String, String> body) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<>(body, headers);
+            return restTemplate.postForEntity(url, requestEntity, String.class);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error calling AI Service at " + url + ": " + e.getMessage());
+        }
+    }
+
+    private ResponseEntity<String> callAiServiceMultipart(String url, MultiValueMap<String, Object> body) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+            return restTemplate.postForEntity(url, requestEntity, String.class);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error calling AI Service at " + url + ": " + e.getMessage());
+        }
+    }
+}
