@@ -93,4 +93,17 @@ public class DocumentController {
         String userId = user.getId() != null ? user.getId().toString() : user.getEmail();
         return documentService.generateMindMap(userId, docId);
     }
+
+    @PostMapping("/{docId}/exam")
+    public ResponseEntity<String> exam(
+            @PathVariable("docId") String docId,
+            @AuthenticationPrincipal User user,
+            @RequestParam(value = "marks_1", required = false) Integer marks1,
+            @RequestParam(value = "marks_2", required = false) Integer marks2,
+            @RequestParam(value = "marks_5", required = false) Integer marks5,
+            @RequestParam(value = "marks_10", required = false) Integer marks10) {
+        if (user == null) return ResponseEntity.status(401).build();
+        String userId = user.getId() != null ? user.getId().toString() : user.getEmail();
+        return documentService.generateExam(userId, docId, marks1, marks2, marks5, marks10);
+    }
 }

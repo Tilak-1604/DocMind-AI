@@ -115,6 +115,27 @@ public class DocumentService {
         return callAiService("http://localhost:8000/documents/" + docId + "/mind-map", body);
     }
 
+    public ResponseEntity<String> generateExam(String userId, String docId, Integer marks1, Integer marks2, Integer marks5, Integer marks10) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", userId);
+        
+        // Add optional parameters with defaults
+        if (marks1 != null) {
+            body.add("marks_1", String.valueOf(marks1));
+        }
+        if (marks2 != null) {
+            body.add("marks_2", String.valueOf(marks2));
+        }
+        if (marks5 != null) {
+            body.add("marks_5", String.valueOf(marks5));
+        }
+        if (marks10 != null) {
+            body.add("marks_10", String.valueOf(marks10));
+        }
+        
+        return callAiService("http://localhost:8000/documents/" + docId + "/exam", body);
+    }
+
     private ResponseEntity<String> callAiService(String url, MultiValueMap<String, String> body) {
         try {
             HttpHeaders headers = new HttpHeaders();

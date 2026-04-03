@@ -9,7 +9,8 @@ from app.services.document_tools_service import (
     generate_flashcards,
     extract_key_topic,
     study_mode,
-    generate_mind_map
+    generate_mind_map,
+    exam_mode
 )
 import shutil
 import os
@@ -159,3 +160,14 @@ async def mind_map(
     user_id: str = Form(...)
 ):
     return {"mind_map": generate_mind_map(user_id, doc_id)}
+
+@app.post("/documents/{doc_id}/exam")
+async def exam(
+    doc_id: str,
+    user_id: str = Form(...),
+    marks_1: int = Form(2),
+    marks_2: int = Form(5),
+    marks_5: int = Form(3),
+    marks_10: int = Form(0)
+):
+    return {"exam_paper": exam_mode(user_id, doc_id, marks_1, marks_2, marks_5, marks_10)}
