@@ -1,25 +1,31 @@
 import json
-from typing import List, Dict, Any
+from typing import List
+
 from groq import Groq
 from pydantic import BaseModel
-from pydantic.json import pydantic_encoder
+
 from app.core.config import settings
-from app.db import SessionLocal
+from app.core.database import SessionLocal
+from app.models.extracted_data import ExtractedChunk
 from app.repositories.chunk_repository import get_document_chunks
 from app.repositories.document_repository import get_document_by_id
-from app.models.extracted_data import ExtractedChunk
 
-# Initialize Groq client (optional for startup)
+# Initialize Groq client (optional — graceful degradation if key missing)
 groq_client = None
 if settings.GROQ_API_KEY:
     groq_client = Groq(api_key=settings.GROQ_API_KEY)
 else:
     print("WARNING: GROQ_API_KEY not found. Extraction features will be disabled.")
 
-# Define Pydantic models for structured output
+
+# ─────────────────────────────────────────────
+# Pydantic models for structured Groq output
+# ─────────────────────────────────────────────
+
 class KeyConcept(BaseModel):
     term: str
     definition: str
+
 
 class ExtractedData(BaseModel):
     chunk_summary: str
@@ -27,14 +33,18 @@ class ExtractedData(BaseModel):
     hierarchical_topics: List[str]
     important_facts: List[str]
 
+
+# ─────────────────────────────────────────────
+# Public entry point
+# ─────────────────────────────────────────────
+
 def run_background_extraction(user_id: str, doc_id: str):
     """
-    Background task to extract structured data from all document chunks
-    and generate final global summary and mind map.
+    Background task: extract structured data from all document chunks,
+    then generate a global summary and a PlantUML mind map.
     """
     db = SessionLocal()
     try:
-        # Mark document as processing
         document = get_document_by_id(db, doc_id)
         if not document:
             print(f"Extraction failed: Document {doc_id} not found.")
@@ -43,7 +53,6 @@ def run_background_extraction(user_id: str, doc_id: str):
         document.extraction_status = "PENDING"
         db.commit()
 
-        # Fetch chunks
         chunks = get_document_chunks(user_id, doc_id)
         if not chunks:
             document.extraction_status = "FAILED"
@@ -52,16 +61,16 @@ def run_background_extraction(user_id: str, doc_id: str):
 
         print(f"Starting background extraction for doc {doc_id} with {len(chunks)} chunks...")
 
-        # Process each chunk
-        chunk_summaries = []
-        all_topics = []
+        chunk_summaries: List[str] = []
+        all_topics: List[str] = []
 
-        max_chunks = 50 # Limit to avoid excessive processing
+        # Cap chunks to avoid excessive Groq token usage
+        max_chunks = 50
         if len(chunks) > max_chunks:
             chunks = chunks[:max_chunks]
 
         for i, chunk_text in enumerate(chunks):
-            print(f"Extracting data for chunk {i+1}/{len(chunks)}...")
+            print(f"Extracting data for chunk {i + 1}/{len(chunks)}...")
             try:
                 prompt = f"""You are a precision data extraction specialist. Your task is to analyze the provided text and extract structured information with maximum accuracy and completeness.
 
@@ -78,14 +87,10 @@ You must output ONLY valid JSON that matches this exact schema:
     }}
   ],
   "hierarchical_topics": [
-    "Broad overarching category",
-    "Mid-level sub-topic",
-    "Specific detailed topic"
+    "Broad Category > Specific Topic > Sub-topic"
   ],
   "important_facts": [
-    "Critical fact 1 (include numbers, dates, names, or key assertions)",
-    "Critical fact 2",
-    "Critical fact 3"
+    "Specific, verifiable fact extracted from the text"
   ]
 }}
 
@@ -121,21 +126,20 @@ You must output ONLY valid JSON that matches this exact schema:
 {chunk_text}
 
 Output only the JSON, no additional text:"""
-                
+
                 if not groq_client:
                     print(f"Skipping extraction for chunk {i}: Groq client not initialized.")
                     continue
 
                 response = groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="openai/gpt-oss-120b",
                     messages=[{"role": "user", "content": prompt}],
                     response_format={"type": "json_object"},
-                    temperature=0.2
+                    temperature=0.2,
                 )
 
                 extracted_data = json.loads(response.choices[0].message.content)
-                
-                # Save to database
+
                 db_chunk = ExtractedChunk(
                     id=f"{doc_id}_ext_{i}",
                     doc_id=doc_id,
@@ -144,28 +148,27 @@ Output only the JSON, no additional text:"""
                     chunk_summary=extracted_data.get("chunk_summary", ""),
                     key_concepts=extracted_data.get("key_concepts", []),
                     hierarchical_topics=extracted_data.get("hierarchical_topics", []),
-                    important_facts=extracted_data.get("important_facts", [])
+                    important_facts=extracted_data.get("important_facts", []),
                 )
                 db.add(db_chunk)
-                
+
                 chunk_summaries.append(extracted_data.get("chunk_summary", ""))
                 all_topics.extend(extracted_data.get("hierarchical_topics", []))
 
             except Exception as e:
                 print(f"Error extracting chunk {i}: {e}")
                 continue
-        
+
         db.commit()
 
-        # Step 2: Generate Global Summary using chunk_summaries
+        # Step 2: Global summary from chunk summaries
         print(f"Generating global summary for doc {doc_id}...")
         global_summary = _generate_global_summary(chunk_summaries)
-        
-        # Step 3: Generate Mind Map PlantUML using all_topics
+
+        # Step 3: Mind map PlantUML from all topics
         print(f"Generating mind map for doc {doc_id}...")
         mind_map_plantuml = _generate_mind_map(all_topics, document.id)
 
-        # Update Document
         document.global_summary = global_summary
         document.mind_map_plantuml = mind_map_plantuml
         document.extraction_status = "COMPLETED"
@@ -175,24 +178,27 @@ Output only the JSON, no additional text:"""
     except Exception as e:
         print(f"Background extraction failed: {e}")
         db.rollback()
-        # Try to mark as failed if document still exists in memory
         try:
             doc = get_document_by_id(db, doc_id)
             if doc:
                 doc.extraction_status = "FAILED"
                 db.commit()
-        except:
+        except Exception:
             pass
     finally:
         db.close()
 
 
+# ─────────────────────────────────────────────
+# Private helpers
+# ─────────────────────────────────────────────
+
 def _generate_global_summary(chunk_summaries: List[str]) -> str:
     if not chunk_summaries:
         return "No summary could be generated."
-        
-    final_content = "\\n\\n".join(chunk_summaries)
-    
+
+    final_content = "\n\n".join(chunk_summaries)
+
     final_prompt = f"""You are an expert document synthesizer. Your task is to create a comprehensive, professionally structured summary from multiple text segments.
 
 **MANDATORY OUTPUT STRUCTURE:**
@@ -231,13 +237,14 @@ def _generate_global_summary(chunk_summaries: List[str]) -> str:
 {final_content}
 
 Generate your comprehensive structured summary:"""
+
     if not groq_client:
         return "Global summary skipped (Groq client not initialized)."
 
     try:
         final_response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": final_prompt}]
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": final_prompt}],
         )
         return final_response.choices[0].message.content.strip()
     except Exception as e:
@@ -247,11 +254,10 @@ Generate your comprehensive structured summary:"""
 
 def _generate_mind_map(topics: List[str], doc_id: str) -> str:
     if not topics:
-        return "@startmindmap\\n* Document\\n@endmindmap"
-        
+        return "@startmindmap\n* Document\n@endmindmap"
+
     unique_topics = list(set(topics))
-    # Basic deduplication and grouping
-    
+
     prompt = f"""You are a mind map architecture expert. Your task is to transform a list of topics into a clear, well-organized PlantUML mind map structure.
 
 **CRITICAL REQUIREMENTS:**
@@ -298,20 +304,21 @@ def _generate_mind_map(topics: List[str], doc_id: str) -> str:
 @endmindmap
 
 Generate the PlantUML mind map now:"""
+
     if not groq_client:
         return "@startmindmap\n* Mindmap disabled (Groq skipped)\n@endmindmap"
 
     try:
         response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}]
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": prompt}],
         )
-        result = response.choices[0].message.content.replace('```plantuml', '').replace('```', '').strip()
-        if not result.startswith('@startmindmap'):
-            result = "@startmindmap\\n" + result
-        if not result.endswith('@endmindmap'):
-            result = result + "\\n@endmindmap"
+        result = response.choices[0].message.content.replace("```plantuml", "").replace("```", "").strip()
+        if not result.startswith("@startmindmap"):
+            result = "@startmindmap\n" + result
+        if not result.endswith("@endmindmap"):
+            result = result + "\n@endmindmap"
         return result
     except Exception as e:
         print(f"Error generating mind map: {e}")
-        return "@startmindmap\\n* Error generating map\\n@endmindmap"
+        return "@startmindmap\n* Error generating map\n@endmindmap"

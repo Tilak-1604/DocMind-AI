@@ -1,8 +1,9 @@
 from sqlalchemy import desc, func as sql_func
-from app.db import SessionLocal
-from app.models.message import Message
+
+from app.core.database import SessionLocal
 from app.models.conversation import Conversation
 from app.models.conversation_summary import ConversationSummary
+from app.models.message import Message
 
 
 # ─────────────────────────────────────────────
@@ -28,7 +29,7 @@ def save_message(conversation_id: str, role: str, content: str):
     message = Message(
         conversation_id=conversation_id,
         role=role,
-        content=content
+        content=content,
     )
     db.add(message)
     db.commit()
@@ -78,7 +79,6 @@ def get_old_messages_for_compression(conversation_id: str, keep_recent: int = 4)
     )
     db.close()
 
-    # Exclude the most recent `keep_recent` messages
     if len(all_messages) <= keep_recent:
         return []
     return all_messages[:-keep_recent]
@@ -104,9 +104,7 @@ def get_conversation_summary(conversation_id: str) -> str | None:
 
 
 def save_conversation_summary(conversation_id: str, summary_text: str):
-    """
-    Upserts the conversation summary. Creates if not exists, updates if exists.
-    """
+    """Upserts the conversation summary. Creates if not exists, updates if exists."""
     db = SessionLocal()
     record = (
         db.query(ConversationSummary)
@@ -119,7 +117,7 @@ def save_conversation_summary(conversation_id: str, summary_text: str):
     else:
         record = ConversationSummary(
             conversation_id=conversation_id,
-            summary=summary_text
+            summary=summary_text,
         )
         db.add(record)
 

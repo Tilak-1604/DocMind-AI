@@ -11,14 +11,15 @@ Five core enhancements:
 
 from google import genai
 from pinecone import Pinecone
+
 from app.core.config import settings
-from app.services.memory_service import (
-    get_recent_messages,
-    save_message,
+from app.services.rag.memory_service import (
+    get_conversation_summary,
     get_message_count,
     get_old_messages_for_compression,
-    get_conversation_summary,
+    get_recent_messages,
     save_conversation_summary,
+    save_message,
 )
 
 # ─────────────────────────────────────────────
@@ -30,7 +31,7 @@ index = pc.Index(settings.PINECONE_INDEX_NAME)
 
 MEMORY_COMPRESSION_THRESHOLD = 6   # Compress when total turns exceed this
 RECENT_TURNS_LIMIT = 4              # Always keep last 4 messages verbatim
-MIN_CHUNKS_BEFORE_FALLBACK = 2     # Trigger fallback if fewer chunks retrieved
+MIN_CHUNKS_BEFORE_FALLBACK = 2      # Trigger fallback if fewer chunks retrieved
 FALLBACK_TOP_K = 8
 FALLBACK_THRESHOLD = 0.15
 PRIMARY_TOP_K = 5
@@ -155,17 +156,15 @@ def maybe_compress_memory(conversation_id: str) -> str | None:
     Checks if memory compression is needed.
     If message count > threshold AND no summary exists yet,
     compresses older messages with Gemini and stores the summary.
-    
+
     Returns the summary text (existing or newly created), or None.
     """
-    # Always try to return existing summary first
     existing_summary = get_conversation_summary(conversation_id)
 
     total_messages = get_message_count(conversation_id)
     print(f"[MEMORY] Total messages in conversation: {total_messages}")
 
     if total_messages > MEMORY_COMPRESSION_THRESHOLD and existing_summary is None:
-        # Only compress once — when threshold is first crossed
         old_messages = get_old_messages_for_compression(
             conversation_id, keep_recent=RECENT_TURNS_LIMIT
         )
@@ -240,39 +239,30 @@ def get_relevant_context(
     print("\n================ RAG ENGINE START ================")
     print(f"[INPUT] User: {user_id} | Question: {question} | Docs: {document_ids}")
 
-    # ──────────────────────────────────────────
     # Step 1: Load recent messages for history
-    # ──────────────────────────────────────────
     recent_messages = get_recent_messages(conversation_id, limit=RECENT_TURNS_LIMIT)
     formatted_history = "\n".join(
         f"{m.role.upper()}: {m.content}" for m in recent_messages
     )
 
-    # ──────────────────────────────────────────
     # Step 2: Query Rewriting (Feature 1)
-    # ──────────────────────────────────────────
     search_query = rewrite_query(question, formatted_history)
 
-    # ──────────────────────────────────────────
     # Step 3: Embed the rewritten query
-    # ──────────────────────────────────────────
     embed_response = gemini_client.models.embed_content(
         model="gemini-embedding-001",
         contents=search_query
     )
     query_embedding = embed_response.embeddings[0].values
 
-    # ──────────────────────────────────────────
     # Step 4: Pinecone Retrieval + Fallback (Feature 3)
-    # ──────────────────────────────────────────
     def run_pinecone_query(top_k: int, threshold: float):
         query_params = {
             "namespace": str(user_id),
             "vector": query_embedding,
             "top_k": top_k,
-            "include_metadata": True
+            "include_metadata": True,
         }
-        
         if document_ids:
             query_params["filter"] = {"doc_id": {"$in": document_ids}}
 
@@ -292,13 +282,11 @@ def get_relevant_context(
     context_chunks, source_ids = run_pinecone_query(PRIMARY_TOP_K, PRIMARY_THRESHOLD)
     print(f"[RETRIEVAL] Chunks found: {len(context_chunks)}")
 
-    # Fallback if recall is low
     if len(context_chunks) < MIN_CHUNKS_BEFORE_FALLBACK:
         print(f"[RETRIEVAL] ⚠️  FALLBACK TRIGGERED — retrying top_k={FALLBACK_TOP_K}, threshold={FALLBACK_THRESHOLD}")
         context_chunks, source_ids = run_pinecone_query(FALLBACK_TOP_K, FALLBACK_THRESHOLD)
         print(f"[RETRIEVAL] Fallback chunks found: {len(context_chunks)}")
 
-    # No context found even after fallback
     if not context_chunks:
         answer = "I cannot find this information in the uploaded documents."
         save_message(conversation_id, "user", question)
@@ -307,22 +295,16 @@ def get_relevant_context(
 
     context_block = "\n\n---\n\n".join(context_chunks)
 
-    # ──────────────────────────────────────────
     # Step 5: Smart Memory Compression (Feature 4)
-    # ──────────────────────────────────────────
     conversation_summary = maybe_compress_memory(conversation_id)
     summary_block = conversation_summary if conversation_summary else "No prior conversation summary."
 
-    # ──────────────────────────────────────────
     # Step 6: Intent Detection (Feature 5)
-    # ──────────────────────────────────────────
     intent = detect_intent(question)
     style_instruction = get_intent_style_instruction(intent)
     print(f"[INTENT] Detected: {intent}")
 
-    # ──────────────────────────────────────────
     # Step 7: Structured Prompt Construction (Feature 2)
-    # ──────────────────────────────────────────
     prompt = f"""You are Docsmind, an expert, precise, and highly structured AI assistant specialized in analyzing PDFs and other documents using Retrieval-Augmented Generation (RAG).
 
 Your core rules:
@@ -361,9 +343,7 @@ CURRENT QUESTION:
 
 Now generate your response following the exact structure above:"""
 
-    # ──────────────────────────────────────────
     # Step 8: Generate Answer with Gemini
-    # ──────────────────────────────────────────
     try:
         gen_response = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
@@ -374,16 +354,11 @@ Now generate your response following the exact structure above:"""
         print(f"[LLM ERROR] {e}")
         answer = "An error occurred while generating the answer. Please try again."
 
-    # ──────────────────────────────────────────
     # Step 9: Persist original question + answer
-    # ──────────────────────────────────────────
     save_message(conversation_id, "user", question)
     save_message(conversation_id, "assistant", answer)
 
     print(f"\n[FINAL ANSWER]\n{answer}")
     print("================ RAG ENGINE END ================\n")
 
-    return {
-        "answer": answer,
-        "sources": source_ids
-    }
+    return {"answer": answer, "sources": source_ids}

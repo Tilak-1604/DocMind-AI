@@ -1,7 +1,7 @@
 from typing import List
 from pinecone import Pinecone
 from app.core.config import settings
-from app.db import SessionLocal
+from app.core.database import SessionLocal
 from app.repositories.document_repository import get_document_with_owner
 
 # Initialize Pinecone

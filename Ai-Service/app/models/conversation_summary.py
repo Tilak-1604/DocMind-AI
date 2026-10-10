@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import Column, String, Text, DateTime
 from sqlalchemy.sql import func
-from app.db import Base
+from app.core.database import Base
 
 
 class ConversationSummary(Base):

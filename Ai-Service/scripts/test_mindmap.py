@@ -6,7 +6,7 @@ import os
 # Add the project root to the python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.services.mind_map_service import generate_mind_map
+from app.services.tools.mind_map_service import generate_mind_map
 
 mock_chunks = [
     "Machine learning (ML) is a field of inquiry devoted to understanding and building methods that 'learn', that is, methods that leverage data to improve performance on some set of tasks.",
@@ -15,7 +15,7 @@ mock_chunks = [
     "Unsupervised learning algorithms take a set of data that contains only inputs, and find structure in the data, like grouping or clustering of data points."
 ]
 
-@patch("app.services.mind_map_service.get_document_chunks")
+@patch("app.services.tools.mind_map_service.get_document_chunks")
 def run_test(mock_get_chunks):
     mock_get_chunks.return_value = mock_chunks
     print("Generating mind map based on mock chunks...")

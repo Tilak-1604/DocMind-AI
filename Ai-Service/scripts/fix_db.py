@@ -2,7 +2,7 @@ import pymysql
 from app.core.config import settings
 
 # Parse the database URL (basic parsing for mysql+pymysql)
-# DATABASE_URL = "mysql+pymysql://root:Tilak1604@localhost:3306/docmind-ai"
+# DATABASE_URL = "mysql+pymysql://root:user@localhost:3306/docmind-ai"
 db_url = settings.DATABASE_URL.replace("mysql+pymysql://", "")
 auth, rest = db_url.split("@")
 user, password = auth.split(":")
@@ -27,7 +27,8 @@ def update_schema():
             queries = [
                 "ALTER TABLE documents ADD COLUMN extraction_status VARCHAR(50) DEFAULT 'PENDING';",
                 "ALTER TABLE documents ADD COLUMN global_summary TEXT;",
-                "ALTER TABLE documents ADD COLUMN mind_map_plantuml TEXT;"
+                "ALTER TABLE documents ADD COLUMN mind_map_plantuml TEXT;",
+                "ALTER TABLE extracted_chunks MODIFY COLUMN id VARCHAR(255);"
             ]
             
             # MySQL 8.0.19+ supports IF NOT EXISTS for columns, but for older versions we might need a safer approach.

@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import Column, String, DateTime, ForeignKey
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.sql import func
-from app.db import Base
+from app.core.database import Base
 
 
 class Message(Base):

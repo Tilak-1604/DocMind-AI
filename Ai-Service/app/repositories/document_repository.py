@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from app.models.document import Document
-from app.db import SessionLocal
+from app.core.database import SessionLocal
 
 
 def get_db():
