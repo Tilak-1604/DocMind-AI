@@ -15,6 +15,7 @@ This is a Spring Boot application.
 
 2. **Run the application**: Navigate to the `Backend` directory and execute the following command:
    ```bash
+   cd /Backend
    mvn spring-boot:run
    ```
 
