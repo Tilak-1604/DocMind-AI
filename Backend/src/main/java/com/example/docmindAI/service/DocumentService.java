@@ -23,7 +23,7 @@ public class DocumentService {
     @Autowired
     private com.example.docmindAI.repository.DocumentRepository documentRepository;
 
-    private static final String AI_SERVICE_URL = "http://localhost:8000/upload";
+    private static final String AI_SERVICE_URL = "http://localhost:8000/documents/upload";
 
     public Document saveDocument(String userId, String docId, String fileName) {
         Document doc = Document.builder()

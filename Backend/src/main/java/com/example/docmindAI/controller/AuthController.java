@@ -85,12 +85,17 @@ public class AuthController {
         }
 
         // The principal is a UsernamePasswordAuthenticationToken whose .getPrincipal() is our User entity
-        if (principal instanceof org.springframework.security.authentication.UsernamePasswordAuthenticationToken authToken) {
-            Object userObj = authToken.getPrincipal();
-            if (userObj instanceof User user) {
-                return ResponseEntity.ok(user);
-            }
+    if (principal instanceof org.springframework.security.authentication.UsernamePasswordAuthenticationToken) {
+        org.springframework.security.authentication.UsernamePasswordAuthenticationToken authToken =
+                (org.springframework.security.authentication.UsernamePasswordAuthenticationToken) principal;
+
+        Object userObj = authToken.getPrincipal();
+
+        if (userObj instanceof User) {
+            User user = (User) userObj;
+            return ResponseEntity.ok(user);
         }
+    }
 
         // Fallback: try to find by name (which should be email for our setup)
         Optional<User> userOpt = userRepository.findByEmail(principal.getName());
